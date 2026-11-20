@@ -8,11 +8,11 @@
 //  (같은 브라우저의 여러 탭끼리만 연결 — 혼자 테스트할 때 사용)
 // ─────────────────────────────────────────────────────────────
 export const firebaseConfig = {
-  apiKey: '여기에_API_KEY',
-  authDomain: '',
-  databaseURL: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyDYkQtWu5KBKpPNyYHdsAWR5SWfQ1jnEOE',
+  authDomain: 'math-kart.firebaseapp.com',
+  databaseURL: 'https://math-kart-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'math-kart',
+  storageBucket: 'math-kart.firebasestorage.app',
+  messagingSenderId: '493866846597',
+  appId: '1:493866846597:web:88b85ffd651290e49c1cec',
 };
