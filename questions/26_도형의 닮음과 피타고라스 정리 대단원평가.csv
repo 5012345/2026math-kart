@@ -1,0 +1,16 @@
+﻿문제,정답,오답1,오답2,오답3,오답4,오답5,제한시간,해설,그림
+"두 직육면체는 서로 닮은 도형이고, $\overline{AB}$에 대응하는 모서리가 $\overline{A'B'}$일 때, $x+y$의 값은?",14,13,16,17,15,21,30,"닮음비 1:2 → $x=4$, $y=10$",sim_01.png
+"$\triangle ABC$와 $\triangle DEF$는 서로 닮은 도형이고 닮음비가 3:5이다. $\triangle ABC$의 넓이가 $18\text{ cm}^2$일 때, $\triangle DEF$의 넓이는?",$50\text{ cm}^2$,$30\text{ cm}^2$,$40\text{ cm}^2$,$45\text{ cm}^2$,$35\text{ cm}^2$,$32\text{ cm}^2$,25,넓이의 비는 9:25,sim_02.png
+"민수는 건물에서 10 m 떨어진 지점에 거울을 놓고, 거울에서 2 m 떨어진 곳에서 거울에 비친 건물을 보았다. 민수의 눈높이가 1.5 m일 때, 건물의 높이는?",7.5 m,8 m,9 m,9.5 m,8.5 m,$\dfrac{40}{3}$ m,30,$2:10=1.5:h$,sim_03.png
+"$\angle A=\angle BCD$, $\overline{AB}=9$ cm, $\overline{BC}=6$ cm일 때, $\overline{AD}$의 길이는?",5 cm,3 cm,4 cm,6 cm,7 cm,8 cm,30,$\triangle ABC\sim\triangle CBD$ → $\overline{BD}=4$ cm,sim_04.png
+"$\triangle ABC$의 두 꼭짓점 B, C에서 $\overline{AC}$, $\overline{AB}$에 내린 수선의 발을 각각 D, E라 할 때, $\triangle FBE$와 닮은 삼각형은 모두 몇 개인가? (단, $\triangle FBE$는 제외)",3개,1개,2개,4개,5개,6개,30,"$\triangle ABD$, $\triangle ACE$, $\triangle FCD$",sim_05.png
+"직사각형 ABCD에서 $\overline{BE}$를 접는 선으로 하여 꼭짓점 C가 $\overline{AD}$ 위의 점 F에 오도록 접었을 때, $\overline{AF}$의 길이는?",12 cm,9 cm,10 cm,11 cm,8 cm,15 cm,35,"$\overline{BF}=\overline{BC}=15$ cm, $\overline{AB}=9$ cm",sim_06.png
+"$\overline{FG}\parallel\overline{BC}\parallel\overline{DE}$일 때, $x+y+z$의 값은?",18,$\dfrac{37}{2}$,19,20,$\dfrac{39}{2}$,16,40,"$x=6$, $y=3$, $z=9$",sim_07.png
+"밑면의 반지름의 길이가 12 cm, 높이가 20 cm인 원뿔 모양 용기에 물을 높이의 $\dfrac{3}{4}$만큼 채웠을 때, 수면의 넓이는?",$81\pi\text{ cm}^2$,$36\pi\text{ cm}^2$,$64\pi\text{ cm}^2$,$100\pi\text{ cm}^2$,$49\pi\text{ cm}^2$,$144\pi\text{ cm}^2$,30,수면의 반지름 9 cm,sim_08.png
+"$\overline{AD}$는 $\angle A$의 이등분선이고 $\triangle ABD$의 넓이가 $20\text{ cm}^2$일 때, $\triangle ADC$의 넓이는?",$16\text{ cm}^2$,$12\text{ cm}^2$,$14\text{ cm}^2$,$18\text{ cm}^2$,$20\text{ cm}^2$,$25\text{ cm}^2$,25,$\overline{BD}:\overline{DC}=10:8$,sim_09.png
+"$\overline{AB}$의 삼등분점이 D, E이고 $\overline{AC}$의 삼등분점이 F, G이다. □EBCG의 넓이가 $80\text{ cm}^2$일 때, $\triangle ABC$의 넓이는?",$144\text{ cm}^2$,$120\text{ cm}^2$,$135\text{ cm}^2$,$180\text{ cm}^2$,$160\text{ cm}^2$,$96\text{ cm}^2$,35,$\triangle AEG:\triangle ABC=4:9$,sim_10.png
+"$\overline{AD}$는 $\triangle ABC$의 중선이고, 점 G, G'은 각각 $\triangle ABC$와 $\triangle GBC$의 무게중심일 때, $\overline{GG'}$의 길이는?",2 cm,1 cm,$\dfrac{3}{2}$ cm,3 cm,$\dfrac{5}{2}$ cm,6 cm,30,"$\overline{AD}=9$ cm, $\overline{GD}=3$ cm",sim_11.png
+"점 G는 $\triangle ABC$의 무게중심이고 $\overline{EF}\parallel\overline{AD}\parallel\overline{IH}$이다. 점 H는 $\overline{CD}$의 중점이고 $\overline{EF}=9$ cm일 때, $\overline{IH}$의 길이는?",3 cm,4 cm,$\dfrac{9}{2}$ cm,6 cm,2 cm,9 cm,40,"$\overline{AD}=18$ cm, $\overline{GD}=6$ cm",sim_12.png
+"직각삼각형 ABC에서 $\overline{AD}=13$, $\overline{BD}=11$, $\overline{DC}=5$일 때, $\overline{AB}$의 길이는?",20,22,24,26,28,16,30,"$\overline{AC}=12$, $\overline{BC}=16$",sim_13.png
+"직사각형 ABCD의 내부의 한 점 P에 대하여 $\overline{AP}=9$, $\overline{DP}=5$일 때, $\overline{BP}^2-\overline{CP}^2$의 값은?",56,52,54,60,58,106,35,$\overline{AP}^2+\overline{CP}^2=\overline{BP}^2+\overline{DP}^2$,sim_14.png
+"$\angle A=90^\circ$인 직각삼각형 ABC의 세 변을 각각 한 변으로 하는 정사각형을 그렸다. $\overline{AC}=3$ cm, $\overline{BC}=5$ cm일 때, $\triangle LFM$의 넓이는?",$8\text{ cm}^2$,$4.5\text{ cm}^2$,$6\text{ cm}^2$,$16\text{ cm}^2$,$9\text{ cm}^2$,$12\text{ cm}^2$,40,$\triangle LFM=\dfrac{1}{2}$□BFML $=\dfrac{1}{2}$□ADEB,sim_15.png
