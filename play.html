@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#2f6bff" />
+  <title>수학 레이싱 · 참가</title>
+  <link rel="stylesheet" href="vendor/katex/katex.min.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="vendor/katex/katex.min.js"></script>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="race"></canvas>
+    <div id="signs"></div>
+
+    <div id="hud" class="hidden">
+      <div id="hud-rank" class="hud"><div class="big"><span id="rank-n">-</span><small id="rank-of">/-</small></div><ul id="hud-top"></ul></div>
+      <div id="hud-right" class="hud">
+        <div class="lapbig">LAP <b id="lap-num">1</b></div>
+        <div class="lap">문제 <b id="lap-n">0</b>/<span id="lap-of">0</span></div>
+        <div class="acc">정답 <span id="acc">0</span>개 · <span id="clock">00:00</span></div>
+        <div class="combo" id="combo"></div>
+        <svg id="loopmap" viewBox="-6 -6 112 112"><path id="loop-path" fill="none" stroke="rgba(0,0,0,0.45)" stroke-width="9" stroke-linejoin="round" /><path id="loop-path2" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round" /><g id="loop-dots"></g></svg>
+      </div>
+      <div id="qbanner" class="panel hidden">
+        <div class="qtag" id="q-tag">Q1</div>
+        <div class="qrow"><div class="qtext" id="q-text"></div><img id="q-img" class="qimg hidden" alt="문제 그림" title="눌러서 크게 보기" /></div>
+        <div class="timer"><i id="q-timer"></i></div>
+        <div class="qdist" id="q-dist"></div>
+        <div class="choices" id="q-choices"></div>
+        <div class="explain hidden" id="q-explain"></div>
+      </div>
+      <div id="speedo" class="hud">
+        <svg viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="54" fill="rgba(10,20,60,0.75)" stroke="#fff" stroke-width="4" />
+          <path d="M 24 92 A 46 46 0 1 1 96 92" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="10" stroke-linecap="round" />
+          <path id="speed-arc" d="M 24 92 A 46 46 0 1 1 96 92" fill="none" stroke="url(#sg)" stroke-width="10" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" />
+          <defs><linearGradient id="sg" x1="0" x2="1"><stop offset="0" stop-color="#22d3ee" /><stop offset="1" stop-color="#ff3d8b" /></linearGradient></defs>
+          <text id="speed-n" x="60" y="66" text-anchor="middle" font-size="30" font-weight="900" font-style="italic" fill="#fff">0</text>
+          <text x="60" y="86" text-anchor="middle" font-size="12" font-weight="800" fill="#9be7ff">km/h</text>
+        </svg>
+      </div>
+      <button class="ctrl" id="btn-left" aria-label="왼쪽 코스">◀</button>
+      <button class="ctrl" id="btn-right" aria-label="오른쪽 코스">▶</button>
+      <button class="ctrl" id="btn-gas" aria-label="가속 (누르고 있기)"><span>▲</span><small>가속</small></button>
+      <div id="gas-hint">⬆ 위쪽 화살표나 <b>가속</b> 버튼을 누르고 있으면 빨라져요!</div>
+      <button id="btn-mute" aria-label="소리 켜기/끄기">🔊</button>
+      <div id="items" class="hidden"><div class="slot main"></div><div class="slot"></div><div class="key">SPACE 사용 · X 버리기</div><button id="btn-drop" class="hidden" aria-label="아이템 버리기">🗑️ 버리기</button></div>
+      <div id="warn">⚠ 미사일 경보!</div>
+      <div id="toast"></div>
+      <div id="center-msg"></div>
+      <div id="img-zoom" class="hidden" title="눌러서 닫기"><img alt="문제 그림 크게 보기" /></div>
+    </div>
+
+    <!-- 입장 -->
+    <div id="scr-join" class="overlay hidden">
+      <div class="card panel">
+        <h2>🏁 수학 레이싱</h2>
+        <div class="sub">내 레이서를 만들고 입장하세요!</div>
+        <div id="room-field">
+          <div class="label">방 번호</div>
+          <input id="in-room" class="field" inputmode="numeric" maxlength="6" placeholder="6자리 숫자" />
+        </div>
+        <canvas class="avatar-preview" id="av-preview" width="260" height="260"></canvas>
+        <div class="label">이름 (번호+이름 추천)</div>
+        <input id="in-name" class="field" maxlength="8" placeholder="예: 12 김민준" />
+        <div class="label">헬멧 색</div>
+        <div class="swatches" id="sw-color"></div>
+        <div class="label">헬멧 장식</div>
+        <div class="pills" id="sw-ears"></div>
+        <div id="theme-pick" class="hidden">
+          <div class="label">내가 탈 것</div>
+          <div class="pills" id="sw-theme"></div>
+        </div>
+        <div class="err" id="join-err"></div>
+        <button class="btn blue" id="btn-join" style="width:100%;margin-top:8px;font-size:22px">입장하기 ▶</button>
+      </div>
+    </div>
+
+    <!-- 대기실 -->
+    <div id="scr-lobby" class="overlay hidden">
+      <div class="card panel">
+        <canvas class="avatar-preview" id="lobby-av" width="260" height="260"></canvas>
+        <h2 id="lobby-name"></h2>
+        <div class="theme-badge" id="lobby-theme"></div>
+        <div class="sub" style="margin-top:10px">선생님이 출발 신호를 주면 시작해요<span class="wait-dots"></span></div>
+        <div class="sub">현재 <b id="lobby-count">0</b>명 참가</div>
+        <div class="theme-badge" id="lobby-mode" style="font-size:15px"></div>
+        <div class="small-note" style="text-align:left;background:#f8fafc;border-radius:12px;padding:10px 14px;font-size:15px">
+          <b>🎮 조작법</b><br />
+          <b style="color:#16a34a">▲ 가속</b> 버튼이나 키보드 <b>↑</b>를 <b>누르고 있으면</b> 점점 빨라지고, 떼면 천천히 느려져요. (↓ 브레이크)<br />
+          ◀ ▶ 버튼, 키보드 ← →, 또는 <b>정답 칸을 직접 터치</b>해서 코스를 바꿔요.<br />
+          정답 코스로 게이트를 통과하면 <b style="color:#0ea5e9">부스트!</b> 연속으로 맞히면 더 오래 빨라져요.<br />
+          바닥의 <b style="color:#0891b2">파란 화살표 발판</b>은 가속, 노란 점프대에서는 만세! 하며 날아올라요. 다른 레이서와 부딪히면 느려져요!
+        </div>
+        <div id="lobby-theme-pick" class="hidden" style="margin-top:12px">
+          <div class="label">탈 것 바꾸기</div>
+          <div class="pills" id="lobby-sw-theme"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 최종 결과 -->
+    <div id="scr-final" class="overlay hidden">
+      <div class="card panel">
+        <h2 id="final-title">🏁 FINISH!</h2>
+        <canvas class="avatar-preview" id="final-av" width="260" height="260"></canvas>
+        <div class="final-rank" id="final-rank">1위</div>
+        <div class="final-stats">
+          <div>정답<b id="final-correct">0</b></div>
+          <div>최고 연속<b id="final-streak">0</b></div>
+          <div>달린 거리<b id="final-dist">0</b></div>
+        </div>
+        <div class="sub" id="final-msg"></div>
+      </div>
+    </div>
+
+    <!-- 오류 -->
+    <div id="scr-msg" class="overlay hidden"><div class="card panel"><h2 id="msg-title"></h2><div class="sub" id="msg-body"></div><button class="btn blue" onclick="location.reload()">다시 시도</button></div></div>
+  </div>
+  <script type="module" src="js/student.js"></script>
+</body>
+</html>

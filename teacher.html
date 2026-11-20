@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>수학 레이싱 · 교사 콘솔</title>
+  <link rel="stylesheet" href="vendor/katex/katex.min.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="vendor/katex/katex.min.js"></script>
+</head>
+<body>
+  <div class="teacher">
+    <header class="t-head">
+      <h1>🏁 수학 <span>레이싱</span></h1>
+      <div class="spacer"></div>
+      <div id="h-info" style="font-weight:800"></div>
+      <div class="code">방 <span id="h-code">------</span></div>
+      <button class="btn ghost" id="btn-sound" style="padding:8px 14px;font-size:16px">🔊</button>
+      <button class="btn ghost" id="btn-newroom" style="padding:8px 14px;font-size:16px">새 방</button>
+    </header>
+
+    <!-- 대기실 -->
+    <main class="t-body t-lobby" id="v-lobby">
+      <section class="t-col">
+        <div class="t-card qr-box">
+          <h3>📱 QR 코드로 입장</h3>
+          <div class="qr" id="qr"></div>
+          <div class="roomcode" id="room-code">------</div>
+          <div class="url" id="join-url"></div>
+          <button class="btn blue" id="btn-open-student" style="width:100%;margin-top:12px;font-size:17px;padding:12px">🧑‍🎓 학생 화면 새 탭으로 열기<br><small style="font-weight:700;opacity:.85">(혼자 테스트할 때 · 누를 때마다 학생 1명)</small></button>
+        </div>
+      </section>
+      <section class="t-col">
+        <div class="t-card players-card">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
+            <h3 style="margin:0">🏎️ 참가한 레이서</h3>
+            <div class="big-count" id="p-count">0</div><div style="font-weight:800;color:#64748b">명</div>
+          </div>
+          <div class="players-grid" id="p-grid"></div>
+        </div>
+        <button class="btn green" id="btn-start" style="font-size:30px;padding:22px">🏁 레이스 시작!</button>
+      </section>
+      <section class="t-col scroll">
+        <div class="t-card">
+          <h3>🗺️ 코스 테마</h3>
+          <div class="theme-cards" id="theme-cards"></div>
+        </div>
+        <div class="t-card">
+          <h3>📚 문제 세트</h3>
+          <div class="inline"><select class="field" id="set-select"></select></div>
+          <div class="inline" style="margin-top:8px">
+            <button class="btn ghost" style="color:#1e3a8a;border-color:#cbd5e1;flex:1;padding:8px;font-size:14px" id="btn-reload-sets">🔄 문제 폴더 다시 읽기</button>
+            <label class="btn ghost" style="color:#1e3a8a;border-color:#cbd5e1;flex:1;padding:8px;font-size:14px;text-align:center">📂 파일 직접 불러오기<input type="file" id="file-in" accept=".csv,.txt,.json" multiple hidden /></label>
+          </div>
+          <div class="small-note" id="set-note"></div>
+          <div class="set-preview" id="set-preview"></div>
+          <div class="inline" style="margin-top:10px"><label for="in-count">출제 문제 수</label><input type="number" class="field sm" id="in-count" min="1" value="10" /></div>
+          <div class="inline" style="margin-top:6px"><label for="in-choices">선택지(코스) 수</label><select class="field sm" id="in-choices" style="width:110px"><option value="6">최대 6개</option><option value="5">최대 5개</option><option value="4">최대 4개</option><option value="3">최대 3개</option></select></div>
+          <div class="small-note">한 바퀴(약 1분)에 한 문제씩, 문제통과지점을 지날 때 판정해요. 문제 수만큼 바퀴를 먼저 완주하면 1등!</div>
+          <div class="inline" style="margin-top:6px"><label for="in-shuffle">문제 순서 섞기</label><input type="checkbox" id="in-shuffle" style="width:26px;height:26px" /></div>
+          <div class="inline" style="margin-top:6px"><label for="in-items">🎁 아이템전 (끄면 스피드전)</label><input type="checkbox" id="in-items" style="width:26px;height:26px" checked /></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 레이스 진행 -->
+    <main class="t-body t-race hidden" id="v-race">
+      <div class="t-card t-question">
+        <div class="qnum" id="r-qnum">Q1<small>/10</small></div>
+        <div class="qbody"><div class="qchips" id="r-chips"></div><div class="qrow t"><div class="qtext" id="r-qtext"></div><img id="r-qimg" class="t-qimg hidden" alt="문제 그림" /></div><div class="opts" id="r-opts"></div></div>
+        <div class="clock"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#e2e8f0" stroke-width="10" /><circle id="r-ring" cx="50" cy="50" r="44" fill="none" stroke="#ff3d8b" stroke-width="10" stroke-linecap="round" pathLength="100" stroke-dasharray="100 100" /></svg><span id="r-sec">0</span></div>
+      </div>
+      <div class="t-card t-track"><div class="finishline"></div><div class="lanes" id="r-lanes"></div></div>
+      <div class="t-side">
+        <div class="t-card">
+          <div class="controls">
+            <button class="btn blue" id="btn-pause">⏸ 일시정지</button>
+            <button class="btn red" id="btn-end">🏁 레이스 종료</button>
+          </div>
+          <div class="small-note">입장 코드 <b id="r-code"></b> · 늦게 온 학생도 입장할 수 있어요</div>
+        </div>
+        <div class="t-card">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><h3 id="r-dist-title" style="margin:0;flex:1">📊 응답 분포</h3><button class="btn ghost" id="btn-reveal" style="color:#1e3a8a;border-color:#cbd5e1;padding:6px 10px;font-size:13px">정답 공개</button></div>
+          <div class="dist-bars" id="r-dist"></div>
+          <div class="stat-line"><span id="r-answered">응답 0/0</span><span id="r-rate"></span></div>
+        </div>
+        <div class="t-card map-card">
+          <svg id="t-loop" viewBox="-6 -6 112 112"><path id="t-loop-path" fill="none" stroke="#cbd5e1" stroke-width="10" stroke-linejoin="round" /><path id="t-loop-path2" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="4 4" stroke-linejoin="round" /><g id="t-loop-dots"></g></svg>
+          <ul class="feed" id="t-feed"><li class="muted">아이템 사용 기록이 여기에 나와요</li></ul>
+        </div>
+      </div>
+    </main>
+
+    <!-- 결과 -->
+    <main class="t-body podium-wrap hidden" id="v-final">
+      <section class="t-col"><div class="podium" id="podium"></div></section>
+      <section class="t-col">
+        <div class="t-card scroll" style="flex:1">
+          <h3>🏆 최종 순위</h3>
+          <table class="rank-table"><thead><tr><th>순위</th><th>레이서</th><th>정답</th><th>최고연속</th><th>완주 기록</th></tr></thead><tbody id="final-table"></tbody></table>
+        </div>
+        <div class="t-card"><h3>📈 문제별 정답률</h3><div class="q-acc" id="q-acc"></div></div>
+        <div class="controls">
+          <button class="btn green" id="btn-again">🔁 같은 설정으로 다시</button>
+          <button class="btn blue" id="btn-lobby">🏠 대기실로</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="js/teacher.js"></script>
+</body>
+</html>
