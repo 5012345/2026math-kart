@@ -7,6 +7,7 @@ import { SHAPE_PATH, mapPoint, lapOf, TRACK_LEN } from './track.js';
 
 const $ = (id) => document.getElementById(id);
 let db, room;
+let celebrated = null; // 축하 팡파르를 울린 레이스
 let meta = null, phase = null, quiz = null, players = {}, progress = {}, answers = {}, events = {};
 let sets = [];          // 문제 폴더 세트
 const localSets = [];   // 직접 불러온 세트
@@ -63,7 +64,12 @@ function route() {
   $('v-final').classList.toggle('hidden', st !== 'finished');
   $('btn-pause').textContent = st === 'paused' ? '▶ 다시 출발' : '⏸ 일시정지';
   $('h-info').textContent = st === 'lobby' ? '' : `${THEMES[meta.theme]?.emoji || '🎲'} ${meta.setTitle || ''}`;
-  if (st === 'finished') renderFinal();
+  if (st === 'finished') {
+    renderFinal();
+    // 시상식 축하 팡파르 (레이스마다 한 번, 방금 끝난 경우만)
+    const key = `${meta.raceId}`;
+    if (celebrated !== key && db.now() - (meta.finishedAt || 0) < 15000) { celebrated = key; setTimeout(() => sound.fanfare('win'), 400); }
+  }
 }
 
 // ───────── 대기실: 참가자 ─────────
@@ -178,7 +184,7 @@ async function tick() {
     // 참가 중인 학생이 모두 완주하면 자동 종료
     const racers = Object.entries(players).filter(([, p]) => p.online !== false);
     if (phase.kind === 'race' && racers.length && racers.every(([id]) => progress[id]?.fin)) {
-      await db.update(base(), { 'meta/status': 'finished', 'meta/finishedAt': now }); sound.finish();
+      await db.update(base(), { 'meta/status': 'finished', 'meta/finishedAt': now });
     }
   } finally { advancing = false; }
 }

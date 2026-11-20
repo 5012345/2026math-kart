@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>수학 레이싱 · 사운드 테스트</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    body { overflow: auto; min-height: 100%; background-attachment: fixed; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; color: #fff; }
+    h1 { margin: 0 0 4px; font-size: 32px; font-style: italic; }
+    .sub { opacity: 0.9; margin: 0 0 18px; font-weight: 700; }
+    section { background: rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 16px; margin-bottom: 16px; }
+    h2 { margin: 0 0 12px; font-size: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+    .grid .btn { font-size: 17px; padding: 14px 10px; line-height: 1.25; }
+    .grid .btn small { display: block; font-size: 12px; font-weight: 700; opacity: 0.9; }
+    .btn.on { outline: 4px solid #ffd60a; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    a { color: #ffd60a; font-weight: 900; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🔊 사운드 테스트</h1>
+    <p class="sub">혼자서도 게임 속 모든 소리를 들어볼 수 있어요. 버튼을 눌러 보세요. (스피커 음량을 확인해 주세요)</p>
+
+    <section>
+      <h2>🎵 배경음악 (맵마다 하나씩)</h2>
+      <div class="grid" id="bgm">
+        <button class="btn blue" data-song="snow">🛷 설원 눈썰매<small>눈꽃 썰매 질주</small></button>
+        <button class="btn blue" data-song="falls">🏄 폭포 서핑<small>폭포 위의 서핑</small></button>
+        <button class="btn blue" data-song="road">🚴 고속도로 자전거<small>하이웨이 스프린트</small></button>
+        <button class="btn red" data-song="">⏹ 음악 끄기</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>💥 당했을 때 (내 화면에서 나는 소리)</h2>
+      <div class="grid">
+        <button class="btn" data-fx="bump">🤕 친구와 쿵!<small>충돌</small></button>
+        <button class="btn" data-fx="alarm,boom">🚀 미사일 명중<small>경보 → 폭발</small></button>
+        <button class="btn" data-fx="slip">🍌 바나나 밟음<small>미끄러지며 빙글빙글</small></button>
+        <button class="btn" data-fx="splash">💧 물폭탄에 갇힘<small>첨벙 보글보글</small></button>
+        <button class="btn" data-fx="fogged">🌫️ 안개 뒤집어씀<small>쉬이익</small></button>
+        <button class="btn" data-fx="block">🛡️ 방패로 막음<small>팅!</small></button>
+        <button class="btn" data-fx="hitConfirm">🎯 내 아이템 명중<small>공격한 쪽에서 남</small></button>
+      </div>
+    </section>
+
+    <section>
+      <h2>🏆 축하</h2>
+      <div class="grid">
+        <button class="btn green" data-fx="fanfare:win">🥇 우승 팡파르<small>1등 학생 · 교사 시상식 화면</small></button>
+        <button class="btn green" data-fx="fanfare:podium">🥈 시상대 팡파르<small>2~3등</small></button>
+        <button class="btn green" data-fx="fanfare:good">👏 완주 축하<small>4등부터</small></button>
+        <button class="btn green" data-fx="finish">🏁 결승선 통과</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>🏎️ 레이스 중 다른 소리</h2>
+      <div class="grid">
+        <button class="btn ghost" data-fx="count">카운트다운</button>
+        <button class="btn ghost" data-fx="go">출발!</button>
+        <button class="btn ghost" data-fx="boost">정답 부스트</button>
+        <button class="btn ghost" data-fx="wrong">오답</button>
+        <button class="btn ghost" data-fx="pad">가속 발판</button>
+        <button class="btn ghost" data-fx="jump">점프</button>
+        <button class="btn ghost" data-fx="pickup">아이템 상자</button>
+        <button class="btn ghost" data-fx="launch">미사일 발사</button>
+        <button class="btn ghost" data-fx="tick">문제 지점 째깍</button>
+      </div>
+    </section>
+
+    <p class="row"><a href="teacher.html">← 교사 화면으로</a></p>
+  </div>
+  <script type="module">
+    import { sound } from './js/common.js';
+    if (sound.muted) sound.toggle(); // 이 페이지에서는 항상 소리 켜기
+    const bgmBtns = [...document.querySelectorAll('[data-song]')];
+    bgmBtns.forEach((b) => b.addEventListener('click', () => {
+      sound.unlock();
+      sound.music(b.dataset.song || null);
+      bgmBtns.forEach((x) => x.classList.toggle('on', x === b && !!b.dataset.song));
+    }));
+    document.querySelectorAll('[data-fx]').forEach((b) => b.addEventListener('click', () => {
+      sound.unlock();
+      b.dataset.fx.split(',').forEach((fx, i) => setTimeout(() => {
+        const [name, arg] = fx.split(':');
+        sound[name](arg);
+      }, i * 800));
+    }));
+  </script>
+</body>
+</html>

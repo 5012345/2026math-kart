@@ -1,3 +1,4 @@
+import { Synth, MusicPlayer, SONGS, midi } from './music.js';
 // 공용 유틸: 수식 렌더링, 효과음, 테마/캐릭터 정의, 게임 상수
 
 export const GAME = {
@@ -83,43 +84,118 @@ export const fmtTime = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); r
 
 // ── 효과음 (Web Audio로 합성 — 파일 없음) ──
 class Sound {
-  constructor() { this.ctx = null; this.muted = localStorage.getItem('kmr-mute') === '1'; }
-  unlock() { if (!this.ctx) { try { this.ctx = new AudioContext(); } catch { /* 미지원 */ } } this.ctx?.resume?.(); }
-  toggle() { this.muted = !this.muted; localStorage.setItem('kmr-mute', this.muted ? '1' : '0'); return this.muted; }
+  constructor() { this.ctx = null; this.muted = localStorage.getItem('kmr-mute') === '1'; this.want = null; this.player = null; this.playing = null; }
+  unlock() {
+    if (!this.ctx) {
+      try {
+        this.ctx = new AudioContext();
+        const comp = this.ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.connect(this.ctx.destination);
+        this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : 1; this.master.connect(comp);
+        this.out = this.ctx.createGain(); this.out.gain.value = 1; this.out.connect(this.master);       // 효과음
+        this.bgm = this.ctx.createGain(); this.bgm.gain.value = 0.32; this.bgm.connect(this.master);    // 배경음악
+        this.syn = new Synth(this.ctx);
+      } catch { /* 미지원 */ }
+    }
+    this.ctx?.resume?.();
+    this._sync();
+  }
+  toggle() {
+    this.muted = !this.muted; localStorage.setItem('kmr-mute', this.muted ? '1' : '0');
+    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : 1, this.ctx.currentTime, 0.05);
+    return this.muted;
+  }
+  /** 배경음악: 'snow' | 'falls' | 'road' | null(끄기). 같은 곡이면 그대로 둠 */
+  music(name) { if (this.want === name) return; this.want = name; this._sync(); }
+  _sync() {
+    if (!this.ctx || this.playing === this.want) return;
+    this.player?.stop(); this.player = null; this.playing = this.want;
+    if (this.want && SONGS[this.want]) this.player = new MusicPlayer(this.syn, this.bgm, SONGS[this.want], () => this.muted);
+  }
+  get t0() { return this.ctx.currentTime + 0.01; }
+  /** 음량을 k배로 키운 출력 (배경음악 위에서도 잘 들리도록) */
+  _g(k) { const g = this.ctx.createGain(); g.gain.value = k; g.connect(this.out); return g; }
+  ok() { return !this.muted && this.ctx && this.ctx.state !== 'closed'; }
   tone(freq, dur, { type = 'sine', vol = 0.18, slide = 0, delay = 0 } = {}) {
-    if (this.muted || !this.ctx) return;
+    if (!this.ok()) return;
     const t = this.ctx.currentTime + delay;
     const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g).connect(this.ctx.destination); o.start(t); o.stop(t + dur + 0.02);
+    o.connect(g).connect(this.out); o.start(t); o.stop(t + dur + 0.02);
   }
-  noise(dur, vol = 0.12) {
-    if (this.muted || !this.ctx) return;
-    const n = Math.floor(this.ctx.sampleRate * dur);
-    const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate); const d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
-    const s = this.ctx.createBufferSource(); const g = this.ctx.createGain(); const f = this.ctx.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = 1400; g.gain.value = vol;
-    s.buffer = buf; s.connect(f).connect(g).connect(this.ctx.destination); s.start();
-  }
+  noise(dur, vol = 0.12) { if (this.ok()) this.syn.noise(this.out, this.t0, dur, vol, { f: 1400 }); }
   count() { this.tone(660, 0.18, { type: 'square', vol: 0.12 }); }
   go() { this.tone(990, 0.5, { type: 'square', vol: 0.14 }); }
   move() { this.tone(520, 0.05, { type: 'triangle', vol: 0.08 }); }
   boost() { this.noise(0.7, 0.18); this.tone(300, 0.6, { type: 'sawtooth', vol: 0.1, slide: 900 }); this.tone(880, 0.15, { vol: 0.15, delay: 0.05 }); this.tone(1320, 0.25, { vol: 0.15, delay: 0.15 }); }
   wrong() { this.tone(200, 0.35, { type: 'sawtooth', vol: 0.12, slide: -120 }); }
   tick() { this.tone(1200, 0.04, { type: 'square', vol: 0.05 }); }
-  bump() { this.noise(0.15, 0.25); this.tone(140, 0.18, { type: 'square', vol: 0.12, slide: -60 }); }
-  boom() { this.noise(0.6, 0.3); this.tone(90, 0.5, { type: 'sawtooth', vol: 0.15, slide: -50 }); }
+  /** 친구와 쿵! — 둔탁한 충돌음 + 용수철처럼 튕기는 소리 */
+  bump() {
+    if (!this.ok()) return; const s = this.syn, t = this.t0, o = this._g(2.2);
+    s.kick(o, t, 0.9);
+    s.noise(o, t, 0.12, 0.3, { type: 'lowpass', f: 900 });
+    const g = this.ctx.createGain(); g.connect(o);
+    s.osc(g, 'triangle', 220, t + 0.04, s.env(g, t + 0.04, 0.14, 0.005, 0.35), { slideTo: 520, vib: 18 });
+  }
+  /** 미사일 명중 — 큰 폭발 + 파편 + 공중으로 날아가며 떨어지는 휘파람 */
+  boom() {
+    if (!this.ok()) return; const s = this.syn, t = this.t0, o = this._g(1.6);
+    s.noise(o, t, 1.0, 0.55, { type: 'lowpass', f: 4000, fTo: 120, a: 0.003 });
+    const g = this.ctx.createGain(); g.connect(o); s.osc(g, 'sine', 110, t, s.env(g, t, 0.6, 0.003, 0.7), { slideTo: 28 });
+    for (let i = 0; i < 7; i++) s.noise(o, t + 0.15 + Math.random() * 0.6, 0.03, 0.12, { type: 'highpass', f: 2500 + Math.random() * 3000 });
+    const w = this.ctx.createGain(); w.connect(o); s.osc(w, 'triangle', 1400, t + 0.35, s.env(w, t + 0.35, 0.09, 0.05, 1.3), { slideTo: 260, vib: 7 });
+  }
+  /** 바나나 밟음 — 미끄러지는 휘슬 + 빙글빙글 도는 소리 */
+  slip() {
+    if (!this.ok()) return; const s = this.syn, t = this.t0, o = this._g(2.4);
+    s.noise(o, t, 0.12, 0.25, { type: 'lowpass', f: 600 }); // 철퍽
+    const g = this.ctx.createGain(); g.connect(o); s.osc(g, 'triangle', 500, t + 0.03, s.env(g, t + 0.03, 0.14, 0.01, 0.28), { slideTo: 1500 });
+    const g2 = this.ctx.createGain(); g2.connect(o); s.osc(g2, 'triangle', 1500, t + 0.3, s.env(g2, t + 0.3, 0.12, 0.01, 0.5), { slideTo: 380 });
+    for (let i = 0; i < 6; i++) { const gg = this.ctx.createGain(); gg.connect(o); const tt = t + 0.85 + i * 0.16; s.osc(gg, 'square', i % 2 ? 660 : 880, tt, s.env(gg, tt, 0.05 * (1 - i / 7), 0.004, 0.1)); }
+  }
+  /** 물폭탄에 갇힘 — 첨벙 + 보글보글 */
+  splash() {
+    if (!this.ok()) return; const s = this.syn, t = this.t0, o = this._g(2.2);
+    s.noise(o, t, 0.5, 0.28, { type: 'lowpass', f: 2500, fTo: 300 });
+    for (let i = 0; i < 7; i++) { const g = this.ctx.createGain(); g.connect(o); const tt = t + 0.15 + i * 0.11 + Math.random() * 0.04; const f = 280 + Math.random() * 300; s.osc(g, 'sine', f, tt, s.env(g, tt, 0.12, 0.005, 0.09), { slideTo: f * 2.6 }); }
+  }
+  /** 안개를 뒤집어씀 — 쉬이익 */
+  fogged() { if (this.ok()) this.syn.noise(this._g(2.5), this.t0, 1.1, 0.16, { type: 'bandpass', f: 300, fTo: 2400, q: 0.6, a: 0.25 }); }
+  /** 방패가 막아냄 — 팅! */
+  block() { [1760, 2640, 3520].forEach((f, i) => this.tone(f, 0.4 - i * 0.08, { type: 'sine', vol: 0.22 - i * 0.05 })); this.noise(0.05, 0.3); }
+  /** 내 아이템이 친구에게 명중 */
+  hitConfirm() { [988, 1319, 1976].forEach((f, i) => this.tone(f, 0.16, { type: 'square', vol: 0.11, delay: i * 0.08 })); }
   jump() { this.tone(400, 0.35, { type: 'triangle', vol: 0.12, slide: 500 }); }
   land() { this.noise(0.12, 0.15); }
   pad() { this.tone(700, 0.12, { type: 'square', vol: 0.08, slide: 600 }); this.tone(1100, 0.15, { vol: 0.1, delay: 0.08 }); }
   pickup() { [880, 1175, 1568].forEach((f, i) => this.tone(f, 0.08, { type: 'square', vol: 0.07, delay: i * 0.05 })); }
   launch() { this.noise(0.5, 0.15); this.tone(200, 0.5, { type: 'sawtooth', vol: 0.08, slide: 700 }); }
   alarm() { [0, 0.25, 0.5].forEach((d) => this.tone(1000, 0.12, { type: 'square', vol: 0.08, delay: d })); }
-  splash() { this.noise(0.4, 0.2); this.tone(600, 0.3, { vol: 0.08, slide: -400 }); }
   finish() { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.3, { type: 'triangle', vol: 0.15, delay: i * 0.12 })); }
+  /** 축하 팡파르: level 'win'(우승·시상식) | 'podium'(2~3위) | 'good'(완주) */
+  fanfare(level = 'win') {
+    if (!this.ok()) return; const s = this.syn, o = this._g(level === 'win' ? 0.8 : 1); let t = this.t0;
+    const N = (n) => midi(n);
+    if (level === 'win') {
+      for (let i = 0; i < 16; i++) s.snare(o, t + i * 0.055, 0.25 + i * 0.04); // 드럼롤
+      t += 0.95;
+      const seq = [['G4', 0, 0.16], ['C5', 0.18, 0.16], ['E5', 0.36, 0.16], ['G5', 0.54, 0.5], ['E5', 1.08, 0.16], ['G5', 1.26, 1.5]];
+      seq.forEach(([n, d, len]) => s.note(o, 'brass', N(n), t + d, len));
+      ['C4', 'E4', 'G4'].forEach((n) => s.note(o, 'brass', N(n), t + 1.26, 1.5, 0.55));
+      s.note(o, 'bell', N('C7'), t + 1.26, 0.5); s.note(o, 'bell', N('G6'), t + 1.4, 0.5);
+      s.kick(o, t + 1.26); s.crash(o, t + 1.26);
+      s.applause(o, t + 1.3, 3.5);
+    } else if (level === 'podium') {
+      const seq = [['C5', 0, 0.14], ['E5', 0.15, 0.14], ['G5', 0.3, 0.14], ['C6', 0.45, 0.9]];
+      seq.forEach(([n, d, len]) => s.note(o, 'brass', N(n), t + d, len, 0.9));
+      s.crash(o, t + 0.45, 0.6); s.applause(o, t + 0.5, 2.2, 0.8);
+    } else {
+      ['E5', 'G5', 'C6', 'E6'].forEach((n, i) => s.note(o, 'bell', N(n), t + i * 0.13, 0.4));
+      s.applause(o, t + 0.5, 1.6, 0.5);
+    }
+  }
 }
 export const sound = new Sound();
 

@@ -332,7 +332,7 @@ function stun(type, secs) {
 const stunned = () => S.stun && nowL() < S.stun.end;
 /** 공격 받기: 방패가 있으면 막아냄 */
 function takeHit(type, secs, msg) {
-  if (S.shield > 0) { S.shield = 0; toast('🛡️ 방패가 막아냈어요!'); scene.burst(scene.meScreen.x / scene.cssScale, scene.meScreen.y / scene.cssScale - 60, 16, '#7cffc4'); publish(true); return false; }
+  if (S.shield > 0) { S.shield = 0; toast('🛡️ 방패가 막아냈어요!'); sound.block(); scene.burst(scene.meScreen.x / scene.cssScale, scene.meScreen.y / scene.cssScale - 60, 16, '#7cffc4'); publish(true); return false; }
   stun(type, secs);
   if (msg) toast(msg);
   return true;
@@ -412,7 +412,9 @@ function onEvents(all) {
       $('warn').classList.add('show');
     } else if (ev.type === 'fog') {
       const gap = ev.d - S.dist;
-      if (gap > 0 && gap < 400) { S.fog = GAME.FOG_TIME; toast(`🌫️ ${players[ev.from]?.name || ''}님의 안개! 앞이 잘 안 보여요`); }
+      if (gap > 0 && gap < 400) { S.fog = GAME.FOG_TIME; toast(`🌫️ ${players[ev.from]?.name || ''}님의 안개! 앞이 잘 안 보여요`); sound.fogged(); }
+    } else if ((ev.type === 'bananaHit' || ev.type === 'missileHit') && ev.by === pid) {
+      sound.hitConfirm(); toast(`${ev.type === 'bananaHit' ? '🍌' : '🚀'} ${players[ev.to]?.name || ''}님에게 명중!`);
     } else if (ev.type === 'water') {
       const gap = S.dist - ev.d;
       if (gap > 0 && gap < 45) { if (takeHit('bubble', GAME.BUBBLE_TIME, `💧 ${players[ev.from]?.name || ''}님의 물폭탄!`)) sound.splash(); }
@@ -468,7 +470,7 @@ function courseEvents(t) {
         db.remove(`rooms/${room}/hazards/${hid}`);
         db.set(`rooms/${room}/events/${hid}h`, { type: 'bananaHit', to: pid, by: h.by, t: db.now() });
         delete hazards[hid];
-        if (takeHit('spin', GAME.SPIN_TIME, `🍌 ${players[h.by]?.name || ''}님의 바나나를 밟았어요!`)) sound.wrong();
+        if (takeHit('spin', GAME.SPIN_TIME, `🍌 ${players[h.by]?.name || ''}님의 바나나를 밟았어요!`)) sound.slip();
       }
     }
   }
@@ -570,7 +572,8 @@ function showFinal() {
     $('final-msg').textContent = rank === 1 ? '🏆 우승! 최고의 수학 레이서!' : rank <= 3 ? '🎉 시상대에 올랐어요!' : S.correct >= (quiz?.length || 1) * 0.7 ? '👍 훌륭해요! 실력이 쑥쑥!' : '💪 다음 레이스에서 더 빨라질 거예요!';
     drawPreview($('final-av'), me);
     $('scr-final').classList.remove('hidden');
-    sound.finish();
+    sound.music(null);
+    sound.fanfare(rank === 1 ? 'win' : rank <= 3 ? 'podium' : 'good');
   }, 1600);
 }
 
@@ -589,6 +592,8 @@ function frame(tms) {
     const kind = phase?.kind;
     const N = NQ();
     if (quiz && status !== 'lobby') syncQi();
+    // 배경음악: 카운트다운부터 완주 전까지, 내 맵에 맞는 곡 (일시정지 중엔 멈춤)
+    sound.music(status === 'racing' && (kind === 'count' || kind === 'race') && !S.finAt ? themeOf(me) : null);
     const showingResult = S.resultIdx >= 0 && t < S.resultUntil;
     const dispIdx = showingResult ? S.resultIdx : S.qi;
     const q = quiz?.[Math.min(dispIdx, Math.max(0, N - 1))];
@@ -624,9 +629,12 @@ function frame(tms) {
     }
     // 미사일 명중
     if (S.incoming && t >= S.incoming.hitAt) {
-      const from = players[S.incoming.from]?.name || '';
+      const fromId = S.incoming.from, from = players[fromId]?.name || '';
       S.incoming = null; $('warn').classList.remove('show');
-      if (takeHit('fly', GAME.FLY_TIME, `🚀 ${from}님의 미사일에 맞았어요!`)) { scene.addEffect('boom'); sound.boom(); S.shake = 0.5; }
+      if (takeHit('fly', GAME.FLY_TIME, `🚀 ${from}님의 미사일에 맞았어요!`)) {
+        scene.addEffect('boom'); sound.boom(); S.shake = 0.5;
+        db.set(`rooms/${room}/events/m${Date.now()}${pid}`, { type: 'missileHit', to: pid, by: fromId, from: pid, t: db.now() });
+      }
     }
     if (moving) courseEvents(t);
     // 문제통과지점 판정 (한 바퀴에 한 번, 고정 위치)
@@ -710,6 +718,7 @@ function frame(tms) {
     if (status !== 'lobby') publish();
     updateHUD(dt);
   } else {
+    sound.music(null);
     st.startLine = true;
     tx = scene.laneX(Math.min(S.lane, S.nLanes - 1), S.nLanes, S.dist);
   }
