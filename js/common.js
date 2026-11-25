@@ -2,6 +2,9 @@ import { Synth, MusicPlayer, SONGS, midi } from './music.js';
 // 공용 유틸: 수식 렌더링, 효과음, 테마/캐릭터 정의, 게임 상수
 
 export const GAME = {
+  GRID_GAP: 4.5,         // 출발 대열 줄 간격 (m) — 6코스 × 여러 줄
+  GRID_FRONT: 2,         // 맨 앞줄이 출발선 뒤로 떨어진 거리 (m)
+  START_GRACE: 3,        // 출발 직후 충돌 없는 시간 (초)
   BASE_SPEED: 30,        // m/s 최고 속도 (화면 표시 108km/h) — 한 바퀴 약 55초
   GAS_UP: 0.55,          // 가속 버튼을 누르고 있을 때 스로틀이 오르는 속도 (/초) → 약 1.8초면 최고 속도
   GAS_DOWN: 0.3,         // 손을 떼면 스로틀이 내려가는 속도 (/초)
@@ -80,6 +83,8 @@ export function shuffle(arr, rnd = Math.random) {
 
 export function hashStr(s) { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
+/** 0.1초까지: 01:23.4 */
+export const fmtTimeD = (ms) => { const t = Math.max(0, Math.round(ms / 100)); const s = Math.floor(t / 10); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}.${t % 10}`; };
 export const fmtTime = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
 // ── 효과음 (Web Audio로 합성 — 파일 없음) ──

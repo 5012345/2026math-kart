@@ -86,7 +86,7 @@ $('in-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-
 // ───────── 구독 ─────────
 function subscribe() {
   const base = `rooms/${room}`;
-  S.lane = hashStr(pid) % 4; // 출발 위치를 흩어 놓기
+  S.lane = hashStr(pid) % 6; // 대열 배정 전 임시 코스
   unsub.push(db.on(`${base}/meta`, (v) => { meta = v; if (!v) return showMsg('방이 종료되었어요', '선생님의 새 QR 코드로 다시 입장하세요.'); updateScreens(); }));
   unsub.push(db.on(`${base}/phase`, (v) => { phase = v; }));
   unsub.push(db.on(`${base}/quiz`, (v) => { quiz = v ? Object.values(v) : null; }));
@@ -160,10 +160,25 @@ function updateScreens() {
   if (st === 'finished' && !S.finishedShown) showFinal();
 }
 
+/** 출발 대열 자리: 선생님이 정해 준 번호 → (줄, 코스). 늦게 들어온 학생은 맨 뒤 */
+function gridSpot() {
+  const g = meta?.grid || {};
+  const cols = Math.max(2, Math.min(6, meta?.gridCols || 6));
+  const slot = g[pid] ?? Object.keys(g).length + (hashStr(pid) % cols);
+  return { row: Math.floor(slot / cols), lane: slot % cols, cols };
+}
 function resetRace() {
   S.raceId = meta.raceId;
-  Object.assign(S, { dist: 0, prevDist: 0, speed: 0, power: 0, gasUsed: false, boost: 0, pad: 0, nitro: 0, slow: 0, bump: 0, shield: 0, fog: 0, stun: null, air: null, incoming: null, items: [], correct: 0, streak: 0, best: 0, curIdx: -1, curKind: null, qi: 0, resultIdx: -1, resultUntil: 0, finAt: 0, finishedShown: false });
+  const spot = gridSpot();
+  const back = spot.row * GAME.GRID_GAP;               // 맨 앞줄보다 뒤에 선 거리 (m)
+  S.gridRow = spot.row; S.gridOff = back;
+  S.creditMs = Math.round((back / GAME.BASE_SPEED) * 1000); // 그 거리를 최고 속도로 달리는 시간만큼 기록에서 빼 줌
+  S.nLanes = spot.cols; scene.lanes = spot.cols; // 첫 문제 코스 수로 미리 맞춰 둬야 자리가 옮겨지지 않음
+  S.lane = spot.lane; S.goT = null;
+  const start = -(GAME.GRID_FRONT + back);
+  Object.assign(S, { dist: start, prevDist: start, speed: 0, power: 0, gasUsed: false, boost: 0, pad: 0, nitro: 0, slow: 0, bump: 0, shield: 0, fog: 0, stun: null, air: null, incoming: null, items: [], correct: 0, streak: 0, best: 0, curIdx: -1, curKind: null, qi: 0, resultIdx: -1, resultUntil: 0, finAt: 0, finishedShown: false });
   $('scr-final').classList.add('hidden');
+  setTimeout(() => toast(`🚦 출발 위치: ${spot.row + 1}번째 줄 · ${LANE_LABELS[spot.lane]}코스${spot.row ? ` (뒷줄 보정 ${(S.creditMs / 1000).toFixed(2)}초)` : ''}`), 300);
   S.judged = new Set(); S.seen = new Set(); S.picked = new Set(); S.bumpCD = {};
   others.clear();
   renderItems();
@@ -230,7 +245,7 @@ window.addEventListener('keydown', (e) => {
   if (['ArrowRight', 'd', 'D'].includes(e.key)) setLane(S.lane + 1);
   if ([' ', 'Control', 'Shift'].includes(e.key)) { e.preventDefault(); if (!e.repeat) useItem(); }
   if (['x', 'X', 'Backspace', 'Delete'].includes(e.key)) { e.preventDefault(); dropItem(); }
-  const n = '1234'.indexOf(e.key); if (n >= 0) setLane(n);
+  const n = '123456'.indexOf(e.key); if (n >= 0) setLane(n);
 });
 let touchStart = null;
 $('race').addEventListener('pointerdown', (e) => { sound.unlock(); touchStart = { x: e.clientX, y: e.clientY }; });
@@ -350,8 +365,8 @@ function renderItems() {
 }
 /** 순위: 완주한 사람은 완주 시각 순, 나머지는 달린 거리 순 */
 function myRankInfo() {
-  const list = Object.entries(progress).filter(([id]) => players[id]).map(([id, p]) => ({ id, d: id === pid ? S.dist : estDist(p), fin: id === pid ? S.finAt : p.fin || 0 }));
-  if (!list.find((x) => x.id === pid)) list.push({ id: pid, d: S.dist, fin: S.finAt });
+  const list = Object.entries(progress).filter(([id]) => players[id]).map(([id, p]) => ({ id, d: id === pid ? S.dist + (S.gridOff || 0) : estDist(p) + (p.go || 0), fin: id === pid ? S.finAt : p.fin || 0 }));
+  if (!list.find((x) => x.id === pid)) list.push({ id: pid, d: S.dist + (S.gridOff || 0), fin: S.finAt });
   list.sort((a, b) => (a.fin && b.fin ? a.fin - b.fin : a.fin ? -1 : b.fin ? 1 : b.d - a.d));
   return { list, rank: list.findIndex((x) => x.id === pid) + 1 };
 }
@@ -476,6 +491,7 @@ function courseEvents(t) {
   }
 }
 function collisions(t, tx) {
+  if (S.goT == null || t - S.goT < GAME.START_GRACE) return; // 출발 직후에는 충돌 없음
   if (stunned() || S.shield > 0 || S.speed < 3 || S.air) return;
   for (const [oid, o] of others) {
     const p = progress[oid];
@@ -509,7 +525,7 @@ function publish(force = false) {
   S.lastPub = now;
   db.set(`rooms/${room}/progress/${pid}`, {
     d: Math.round(S.dist * 10) / 10, v: Math.round(S.speed * 10) / 10, l: physLane(),
-    c: S.correct, s: S.streak, b: S.best, j: [...S.judged].join(','), r: meta?.raceId || '', q: S.qi, n: S.nLanes, fin: S.finAt || 0,
+    c: S.correct, s: S.streak, b: S.best, j: [...S.judged].join(','), r: meta?.raceId || '', q: S.qi, n: S.nLanes, fin: S.finAt || 0, go: S.gridOff || 0,
     bo: S.boost > 0 || S.pad > 0 || S.nitro > 0 ? 1 : 0, ...fxForPublish(), t: db.now(),
   });
 }
@@ -603,6 +619,7 @@ function frame(tms) {
     if (S.lane >= S.nLanes) setLane(S.nLanes - 1, false);
     const finished = status === 'finished' || !!S.finAt;
     const moving = status === 'racing' && kind === 'race' && !S.finAt;
+    if (moving && S.goT == null) S.goT = t;
     // 속도
     let m = 1;
     if (S.boost > 0) m = Math.max(m, GAME.BOOST_MULT);
@@ -644,7 +661,7 @@ function frame(tms) {
     }
     // 결승선
     if (moving && quiz && S.qi >= N && N > 0 && S.dist >= N * TRACK_LEN) {
-      S.finAt = db.now(); publish(true);
+      S.finAt = db.now() - (S.creditMs || 0); publish(true); // 기록 = 실제 시간 − 뒷줄 보정
       centerMsg('FINISH!', 'gold'); sound.finish();
       setTimeout(() => { if (!S.finishedShown) showFinal(); }, 1200);
     }

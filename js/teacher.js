@@ -2,7 +2,7 @@
 import { getBackend, mockBanner, isMock } from './backend.js';
 import { qrSVG } from './qr.js';
 import { parseQuestionFile } from './question-parser.js';
-import { GAME, THEMES, ITEMS, LANE_COLORS, LANE_LABELS, mathHTML, esc, shuffle, avatarURL, sound, fmtTime } from './common.js';
+import { GAME, THEMES, ITEMS, LANE_COLORS, LANE_LABELS, mathHTML, esc, shuffle, avatarURL, sound, fmtTime, fmtTimeD } from './common.js';
 import { SHAPE_PATH, mapPoint, lapOf, TRACK_LEN } from './track.js';
 
 const $ = (id) => document.getElementById(id);
@@ -161,12 +161,15 @@ async function startRace() {
   });
   const now = db.now();
   const raceId = now.toString(36);
+  // 출발 대열: 접속 중인 학생을 무작위로 섞어 6코스 × 여러 줄에 배치 (뒷줄 보정은 학생 화면에서 기록에 반영)
+  const grid = {};
+  shuffle(Object.entries(players).filter(([, p]) => p.online !== false).map(([id]) => id)).forEach((id, i) => { grid[id] = i; });
   revealed.clear(); selQ = null;
   await db.update(base(), {
     quiz: qz, progress: null, answers: null, hazards: null, events: null, boxes: null, 'meta/items': cfg.items !== false,
     phase: { kind: 'count', start: now, end: now + GAME.COUNTDOWN },
     'meta/status': 'racing', 'meta/raceId': raceId, 'meta/raceStart': now + GAME.COUNTDOWN,
-    'meta/total': qz.length, 'meta/trackLen': qz.length * TRACK_LEN, 'meta/setTitle': s.title, 'meta/theme': cfg.theme,
+    'meta/grid': grid, 'meta/gridCols': qz[0]?.choices.length || maxC, 'meta/total': qz.length, 'meta/trackLen': qz.length * TRACK_LEN, 'meta/setTitle': s.title, 'meta/theme': cfg.theme,
   });
 }
 $('btn-start').onclick = () => {
@@ -209,7 +212,7 @@ $('btn-lobby').onclick = () => db.update(base(), { 'meta/status': 'lobby', phase
 /** 순위: 완주 시각 순 → 달린 거리 순 */
 function standings() {
   return Object.entries(players).map(([id, p]) => ({ id, p, g: progress[id] || {} }))
-    .sort((a, b) => (a.g.fin && b.g.fin ? a.g.fin - b.g.fin : a.g.fin ? -1 : b.g.fin ? 1 : (b.g.d || 0) - (a.g.d || 0) || (b.g.c || 0) - (a.g.c || 0)));
+    .sort((a, b) => (a.g.fin && b.g.fin ? a.g.fin - b.g.fin : a.g.fin ? -1 : b.g.fin ? 1 : effD(b.g) - effD(a.g) || (b.g.c || 0) - (a.g.c || 0)));
 }
 
 let selQ = null;              // 선택한 문제 (null = 자동: 가장 많은 학생이 풀고 있는 문제)
@@ -322,13 +325,16 @@ function renderFeed() {
   $('t-feed').innerHTML = list.length ? list.map((l) => `<li>${l}</li>`).join('') : `<li class="muted">${meta?.items === false ? '스피드전 (아이템 없음)' : '아이템 사용 기록이 여기에 나와요'}</li>`;
 }
 
+/** 순위용 거리: 출발 대열 뒷줄만큼 더해 줌 (뒷줄이 불리하지 않도록) */
+const effD = (g) => (g.d || 0) + (g.go || 0);
+
 // ───────── 결과 ─────────
 function renderFinal() {
   const st = standings();
   const order = [1, 0, 2];
   $('podium').innerHTML = order.map((k) => st[k] ? `<div class="step s${k + 1}"><img src="${avatarURL(st[k].p, 200)}" alt=""><div class="name">${esc(st[k].p.name)}</div><div class="block">${k + 1}</div></div>` : '').join('');
   const nQ = quiz?.length || meta?.total || 0;
-  const rec = (g) => (g.fin && meta?.raceStart ? fmtTime(g.fin - meta.raceStart) : `${((g.d || 0) / 1000).toFixed(2)}km`);
+  const rec = (g) => (g.fin && meta?.raceStart ? fmtTimeD(g.fin - meta.raceStart) : `${((g.d || 0) / 1000).toFixed(2)}km`);
   $('final-table').innerHTML = st.map((x, idx) => `<tr><td>${idx + 1}</td><td><img src="${avatarURL(x.p, 56)}" alt=""> ${esc(x.p.name)}</td><td>${x.g.c || 0}/${nQ}</td><td>${x.g.b || 0}</td><td>${rec(x.g)}</td></tr>`).join('');
   $('q-acc').innerHTML = (quiz || []).map((q, i) => {
     const a = Object.values(answers?.[i] || {}); const ok = a.filter((x) => x.ok).length;
