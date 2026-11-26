@@ -25,7 +25,23 @@ export const padLanes = (pad, n, lap = 0) => [...Array(n).keys()].filter((i) => 
 // 아이템 상자 1곳: 모든 코스에 하나씩
 export const ITEM_ROWS = [{ s: 150 }];
 export const rowLanes = (row, n) => [...Array(n).keys()];
-export const BOX_RESPAWN = 4000; // 상자 다시 생기는 시간(ms)
+export const BOX_RESPAWN = 500; // 상자 다시 생기는 시간(ms)
+
+// ── 맵별 장애물: 2바퀴에 한 곳(1·3·5…번째 바퀴), 코스 2개에 놓임 ──
+//  설원: 눈더미(10~15m, 지나는 동안 느려짐) / 폭포: 돌부리(부딪히면 3초 느려지고 휘청) / 고속도로: 흙탕물 웅덩이(3초 느려짐)
+export const HAZARD_S = 980; // 점프대 착지 뒤 ~ 지하터널 앞
+export const HAZARD_KIND = { snow: 'snowdrift', falls: 'rock', road: 'mud' };
+const h32 = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+/** lap(0부터) 바퀴의 장애물. 모든 학생이 같은 결과를 얻도록 레이스 번호(seed)로 코스를 고름 */
+export function hazardAt(lap, n, seed, theme) {
+  const kind = HAZARD_KIND[theme];
+  if (!kind || lap < 0 || lap % 2 !== 0 || n < 2) return null;
+  const r = h32(`${seed}|${lap}`);
+  const a = r % n;
+  const lanes = n >= 3 ? [a, (a + 1 + ((r >>> 8) % (n - 1))) % n] : [a];
+  const len = kind === 'snowdrift' ? 10 + ((r >>> 16) % 6) : kind === 'mud' ? 7 : 2.2;
+  return { kind, s: HAZARD_S, len, lanes };
+}
 export const OVERPASS_H = 1.8;   // 고가도로 높이
 export const TUNNEL_H = 2.7;     // 터널 천장 높이
 const ELEV_RAMP = 55;            // 고가도로 오르막·내리막 길이

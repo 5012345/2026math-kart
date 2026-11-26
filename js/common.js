@@ -4,7 +4,9 @@ import { Synth, MusicPlayer, SONGS, midi } from './music.js';
 export const GAME = {
   GRID_GAP: 4.5,         // 출발 대열 줄 간격 (m) — 6코스 × 여러 줄
   GRID_FRONT: 2,         // 맨 앞줄이 출발선 뒤로 떨어진 거리 (m)
-  START_GRACE: 3,        // 출발 직후 충돌 없는 시간 (초)
+  START_GRACE: 3,
+  HAZARD_MULT: 0.7,      // 맵 장애물: 속도 30% 감소
+  HAZARD_TIME: 3,        // 돌부리·웅덩이 감속 시간(초)        // 출발 직후 충돌 없는 시간 (초)
   BASE_SPEED: 30,        // m/s 최고 속도 (화면 표시 108km/h) — 한 바퀴 약 55초
   GAS_UP: 0.55,          // 가속 버튼을 누르고 있을 때 스로틀이 오르는 속도 (/초) → 약 1.8초면 최고 속도
   GAS_DOWN: 0.3,         // 손을 떼면 스로틀이 내려가는 속도 (/초)
@@ -172,6 +174,25 @@ class Sound {
   block() { [1760, 2640, 3520].forEach((f, i) => this.tone(f, 0.4 - i * 0.08, { type: 'sine', vol: 0.22 - i * 0.05 })); this.noise(0.05, 0.3); }
   /** 내 아이템이 친구에게 명중 */
   hitConfirm() { [988, 1319, 1976].forEach((f, i) => this.tone(f, 0.16, { type: 'square', vol: 0.11, delay: i * 0.08 })); }
+  /** 눈더미 — 사각사각 파묻히는 소리 */
+  snowdrift() {
+    if (!this.ok()) return; const s = this.syn, t = this.t0, o = this._g(2.2);
+    s.noise(o, t, 0.35, 0.18, { type: 'lowpass', f: 900, fTo: 300 });
+    for (let i = 0; i < 12; i++) s.noise(o, t + i * 0.06 + Math.random() * 0.03, 0.05, 0.1, { type: 'bandpass', f: 2200 + Math.random() * 2500, q: 2.5 });
+  }
+  /** 돌부리에 걸림 — 딱! 쿵 + 휘청이는 소리 */
+  rock() {
+    if (!this.ok()) return; const s = this.syn, t = this.t0, o = this._g(2.2);
+    s.noise(o, t, 0.05, 0.4, { type: 'bandpass', f: 2200, q: 3 }); s.kick(o, t + 0.02, 1);
+    s.noise(o, t + 0.02, 0.2, 0.25, { type: 'lowpass', f: 700 });
+    const g = this.ctx.createGain(); g.connect(o); s.osc(g, 'triangle', 420, t + 0.15, s.env(g, t + 0.15, 0.12, 0.01, 0.9), { slideTo: 220, vib: 6 });
+  }
+  /** 흙탕물 웅덩이 — 철퍼덕 */
+  mud() {
+    if (!this.ok()) return; const s = this.syn, t = this.t0, o = this._g(2.2);
+    s.noise(o, t, 0.5, 0.38, { type: 'lowpass', f: 1100, fTo: 160 });
+    for (let i = 0; i < 4; i++) { const g = this.ctx.createGain(); g.connect(o); const tt = t + 0.2 + i * 0.13; const f = 140 + Math.random() * 90; s.osc(g, 'sine', f, tt, s.env(g, tt, 0.16, 0.005, 0.12), { slideTo: f * 2.2 }); }
+  }
   jump() { this.tone(400, 0.35, { type: 'triangle', vol: 0.12, slide: 500 }); }
   land() { this.noise(0.12, 0.15); }
   pad() { this.tone(700, 0.12, { type: 'square', vol: 0.08, slide: 600 }); this.tone(1100, 0.15, { vol: 0.1, delay: 0.08 }); }

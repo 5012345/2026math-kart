@@ -1,7 +1,7 @@
 // 유사 3D 레이스 화면 렌더러 — 순환 코스(커브·갈래길·점프대·가속발판·아이템 상자), 표지판은 HTML 오버레이
 import { LANE_COLORS, LANE_LABELS, hashStr, mathHTML } from './common.js';
 import { drawRider } from './rider.js';
-import { TRACK_LEN, R, JUMPS, PADS, ITEM_ROWS, SPLITS, TUNNEL_H, TUNNEL_IN, curvatureAt, splitWidthAt, splitBoundary, spreadX, laneXAt, padLanes, rowLanes, zoneAt, overpassElev, tunnelCovered, surfaceH } from './track.js';
+import { TRACK_LEN, R, JUMPS, PADS, ITEM_ROWS, SPLITS, TUNNEL_H, TUNNEL_IN, curvatureAt, splitWidthAt, splitBoundary, spreadX, laneXAt, padLanes, rowLanes, zoneAt, overpassElev, tunnelCovered, surfaceH, hazardAt, HAZARD_S } from './track.js';
 
 const KART_Z = 3;      // 내 캐릭터 깊이
 const Z_MAX = 110;
@@ -278,6 +278,33 @@ export class RaceScene {
           ctx.fillStyle = '#ffe14d'; ctx.fillRect(X(px - hw), y, 0.08 * k, step); ctx.fillRect(X(px + hw - 0.08), y, 0.08 * k, step);
         }
       }
+      // 맵별 장애물 바닥 (눈더미 / 돌부리 자리 / 흙탕물 웅덩이)
+      if (this.hazardSeed != null) {
+        const hz = hazardAt(Math.floor(s / TRACK_LEN), n, this.hazardSeed, this.theme);
+        const rel = hz ? sm - hz.s : -1;
+        if (hz && rel >= 0 && rel < hz.len) for (const hl of hz.lanes) {
+          const px = laneXAt(hl, n, w), full = (R / n) * 0.92;
+          const edge = Math.min(1, rel / 1.6, (hz.len - rel) / 1.6);
+          if (hz.kind === 'snowdrift') {
+            const hw = full * (0.55 + 0.45 * edge) + Math.sin(rel * 2.3 + hl) * 0.06;
+            ctx.fillStyle = '#7fa3cf'; ctx.fillRect(X(px - hw - 0.14), y, (2 * hw + 0.28) * k, step);
+            ctx.fillStyle = stripe ? '#ffffff' : '#f1f7ff'; ctx.fillRect(X(px - hw), y, 2 * hw * k, step);
+            if ((Math.floor(rel * 2.5) + hl) % 3 === 0) { ctx.fillStyle = '#b9d0ec'; ctx.fillRect(X(px - hw * (0.5 + 0.3 * Math.sin(rel * 1.3))), y, hw * 0.45 * k, step); ctx.fillRect(X(px + hw * 0.2), y, hw * 0.3 * k, step); }
+          } else if (hz.kind === 'mud') {
+            const u = Math.min(1, rel / hz.len) * 2 - 1;            // -1 ~ 1 (타원 모양)
+            const hw = full * Math.sqrt(Math.max(0, 1 - u * u)) * 0.95 + 0.05;
+            ctx.fillStyle = '#4a3220'; ctx.fillRect(X(px - hw - 0.07), y, (2 * hw + 0.14) * k, step);
+            ctx.fillStyle = '#6b4a2b'; ctx.fillRect(X(px - hw), y, 2 * hw * k, step);
+            if (u > -0.55 && u < 0.1) { // 하늘이 비친 물빛
+              const hv = hw * 0.45 * Math.sqrt(Math.max(0, 1 - ((u + 0.22) / 0.33) ** 2));
+              ctx.fillStyle = 'rgba(190,210,225,0.55)'; ctx.fillRect(X(px - hw * 0.25 - hv), y, 2 * hv * k, step);
+            }
+          } else {
+            const hw = full * 0.7 * (0.5 + 0.5 * edge);
+            ctx.fillStyle = 'rgba(40,60,70,0.45)'; ctx.fillRect(X(px - hw), y, 2 * hw * k, step);
+          }
+        }
+      }
       // 정답 코스 구역(게이트 앞) 색칠
       const inGate = gate && z < gate.z + 0.3 && z > gate.z - 22;
       if (inGate) {
@@ -485,6 +512,44 @@ export class RaceScene {
     [L, Rt].forEach((x) => { const top = this.project(x, hh, z2), bot = this.project(x, 0, z2); ctx.fillRect(top.x - 0.06 * top.k, top.y, 0.12 * top.k, bot.y - top.y); });
   }
 
+  /** 폭포 코스의 돌부리: 물살 위로 튀어나온 바위 3개 + 물보라 */
+  drawRocks(x, z, seed) {
+    const { ctx } = this; const half = (R / this.lanes) * 0.8;
+    const rocks = [[-0.45, 0.55, 0.5], [0.05, 0.75, 0.62], [0.5, 0.5, 0.45]];
+    rocks.forEach(([ox, hgt, wid], i) => {
+      const bx = x + ox * half;
+      const p0 = this.project(bx, 0, z), p1 = this.project(bx, hgt, z);
+      const k = p0.k, wpx = wid * half * k, top = p1.y;
+      // 물보라
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath(); ctx.ellipse(p0.x, p0.y, wpx * 1.15, Math.max(2, wpx * 0.22), 0, 0, Math.PI * 2); ctx.fill();
+      // 바위 (울퉁불퉁한 다각형)
+      const j = (a) => Math.sin(seed * 3.1 + i * 2.7 + a) * 0.12;
+      ctx.fillStyle = ['#6c757d', '#7b828a', '#5f666d'][i];
+      ctx.beginPath();
+      ctx.moveTo(p0.x - wpx, p0.y);
+      ctx.lineTo(p0.x - wpx * (0.85 + j(1)), p0.y - (p0.y - top) * 0.55);
+      ctx.lineTo(p0.x - wpx * (0.35 + j(2)), top + (p0.y - top) * j(3));
+      ctx.lineTo(p0.x + wpx * (0.2 + j(4)), top);
+      ctx.lineTo(p0.x + wpx * (0.8 + j(5)), p0.y - (p0.y - top) * 0.5);
+      ctx.lineTo(p0.x + wpx, p0.y);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.beginPath(); ctx.moveTo(p0.x - wpx * 0.35, top + 2); ctx.lineTo(p0.x + wpx * 0.2, top); ctx.lineTo(p0.x, p0.y - (p0.y - top) * 0.45); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(30,35,40,0.5)'; ctx.lineWidth = Math.max(1, k * 0.03); ctx.stroke();
+    });
+  }
+  /** 설원 코스의 눈더미 앞쪽 둔덕 */
+  drawSnowMound(x, z, seed) {
+    const { ctx } = this; const half = (R / this.lanes) * 0.9;
+    for (let i = 0; i < 4; i++) {
+      const ox = (i / 3 - 0.5) * 1.5 * half, hgt = 0.42 + 0.14 * Math.sin(seed + i * 1.9);
+      const p0 = this.project(x + ox, 0, z), p1 = this.project(x + ox, hgt, z);
+      const rw = half * 0.42 * p0.k;
+      ctx.fillStyle = '#7fa3cf'; ctx.beginPath(); ctx.ellipse(p0.x, p0.y, rw * 1.08, Math.max(2, p0.y - p1.y + 2), 0, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(p0.x, p0.y - 1, rw, Math.max(2, p0.y - p1.y), 0, Math.PI, 0); ctx.fill();
+    }
+  }
   drawItemBox(x, z, seed, base = 0) {
     const { ctx } = this; const t = this.time;
     const bob = Math.sin(t * 3 + seed) * 0.08;
@@ -748,6 +813,17 @@ export class RaceScene {
     this.roadsideObjects(st, objs);
     JUMPS.forEach((js) => this.forEachAhead(js, (z) => objs.push({ z: z + 2, draw: () => this.drawRamp(z) })));
     this.structures(st, objs);
+    // 돌부리·눈더미 입체 (바닥 위로 튀어나온 부분)
+    if (this.hazardSeed != null) this.forEachAhead(HAZARD_S, (z, abs) => {
+      const hz = hazardAt(Math.floor(abs / TRACK_LEN), this.lanes, this.hazardSeed, this.theme);
+      if (!hz || hz.kind === 'mud') return;
+      const w = splitWidthAt(abs);
+      hz.lanes.forEach((li) => {
+        const x = laneXAt(li, this.lanes, w);
+        if (hz.kind === 'rock') objs.push({ z: z + 0.6, draw: () => this.drawRocks(x, z + 0.6, li) });
+        else objs.push({ z: z + 0.3, draw: () => this.drawSnowMound(x, z + 0.3, li) });
+      });
+    });
     if (st.items) ITEM_ROWS.forEach((row, ri) => this.forEachAhead(row.s, (z, abs) => {
       const w = splitWidthAt(abs);
       rowLanes(row, this.lanes).forEach((li) => {

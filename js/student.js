@@ -2,7 +2,7 @@
 import { getBackend, mockBanner, isMock } from './backend.js';
 import { RaceScene } from './race-renderer.js';
 import { GAME, THEMES, COLORS, EARS, ITEMS, LANE_COLORS, LANE_LABELS, mathHTML, esc, sound, drawAvatarFront, avatarURL, hashStr, fmtTime, rollItem } from './common.js';
-import { TRACK_LEN, R, JUMPS, PADS, ITEM_ROWS, BOX_RESPAWN, splitWidthAt, laneXAt, laneBaseX, padLanes, rowLanes, laneLockAt, sideOf, surfaceH, tunnelCovered, zoneAt, checkpointAbs, SHAPE_PATH, mapPoint, lapOf } from './track.js';
+import { TRACK_LEN, R, JUMPS, PADS, ITEM_ROWS, BOX_RESPAWN, splitWidthAt, laneXAt, laneBaseX, padLanes, rowLanes, laneLockAt, sideOf, surfaceH, tunnelCovered, zoneAt, checkpointAbs, SHAPE_PATH, mapPoint, lapOf, hazardAt } from './track.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -176,7 +176,7 @@ function resetRace() {
   S.nLanes = spot.cols; scene.lanes = spot.cols; // 첫 문제 코스 수로 미리 맞춰 둬야 자리가 옮겨지지 않음
   S.lane = spot.lane; S.goT = null;
   const start = -(GAME.GRID_FRONT + back);
-  Object.assign(S, { dist: start, prevDist: start, speed: 0, power: 0, gasUsed: false, boost: 0, pad: 0, nitro: 0, slow: 0, bump: 0, shield: 0, fog: 0, stun: null, air: null, incoming: null, items: [], correct: 0, streak: 0, best: 0, curIdx: -1, curKind: null, qi: 0, resultIdx: -1, resultUntil: 0, finAt: 0, finishedShown: false });
+  Object.assign(S, { dist: start, prevDist: start, speed: 0, power: 0, gasUsed: false, boost: 0, pad: 0, nitro: 0, slow: 0, bump: 0, shield: 0, fog: 0, stun: null, air: null, incoming: null, items: [], correct: 0, streak: 0, best: 0, curIdx: -1, curKind: null, qi: 0, resultIdx: -1, resultUntil: 0, finAt: 0, finishedShown: false, hzSlow: 0, hzHit: null, wobUntil: 0, inSnow: false });
   $('scr-final').classList.add('hidden');
   setTimeout(() => toast(`🚦 출발 위치: ${spot.row + 1}번째 줄 · ${LANE_LABELS[spot.lane]}코스${spot.row ? ` (뒷줄 보정 ${(S.creditMs / 1000).toFixed(2)}초)` : ''}`), 300);
   S.judged = new Set(); S.seen = new Set(); S.picked = new Set(); S.bumpCD = {};
@@ -210,6 +210,12 @@ function lockToast(lock) {
   sound.bump();
 }
 /** 실제로 달리는 코스: 갈래길에서 막혀 있으면 내 쪽 갈래 안에서 가장 가까운 코스 */
+/** 지금 캐릭터가 실제로 서 있는 코스 (이동 중이면 가까운 쪽) */
+function laneOfX(x) {
+  const n = S.nLanes, w = splitWidthAt(S.dist); let best = 0;
+  for (let i = 1; i < n; i++) if (Math.abs(laneXAt(i, n, w) - x) < Math.abs(laneXAt(best, n, w) - x)) best = i;
+  return best;
+}
 function physLane() {
   const n = S.nLanes, want = Math.min(S.lane, n - 1);
   const lock = laneLockAt(S.dist);
@@ -447,7 +453,7 @@ function crossed(trackS) {
   return pos > a && pos <= b ? pos : null;
 }
 const R_LANE = (n) => (R / n) * 0.95; // 코스 반폭
-/** 상자가 지금 있는지 (누가 먹으면 4초 뒤 다시 생김) */
+/** 상자가 지금 있는지 (누가 먹으면 0.5초 뒤 다시 생김) */
 const boxKey = (ri, li) => `${ri}_${S.nLanes}_${li}`; // 줄·코스 수·코스 번호 (코스 수가 다르면 상자 위치도 다름)
 function boxAvail(ri, li) {
   const key = boxKey(ri, li);
@@ -517,6 +523,7 @@ function fxForPublish() {
   if (S.stun && t < S.stun.end) return { fx: S.stun.type, fs: S.stun.sStart, fe: S.stun.sEnd };
   if (S.air) return { fx: 'air', fs: db.now() - (t - S.air.start) * 1000, fe: db.now() + (S.air.start + S.air.dur - t) * 1000 };
   if (S.shield > 0) return { fx: 'shield', fs: 0, fe: db.now() + S.shield * 1000 };
+  if (t < S.wobUntil) return { fx: 'wob', fs: db.now() - (GAME.HAZARD_TIME - (S.wobUntil - t)) * 1000, fe: db.now() + (S.wobUntil - t) * 1000 };
   return { fx: '', fs: 0, fe: 0 };
 }
 function publish(force = false) {
@@ -541,6 +548,7 @@ function fxDrawOpts(fx, fs, fe, now) {
   if (fx === 'bubble') return { bubble: true, lift: 0.3 + Math.sin(ph * Math.PI * 4) * 0.08 };
   if (fx === 'air') return { lift: Math.sin(ph * Math.PI) * 1.3, cheer: cheerAt(ph) };
   if (fx === 'shield') return { shield: true };
+  if (fx === 'wob') return { wobble: 1 - ph * 0.55 };
   return {};
 }
 
@@ -627,6 +635,23 @@ function frame(tms) {
     if (S.nitro > 0) m = Math.max(m, GAME.NITRO_MULT);
     if (S.slow > 0) m *= GAME.SLOW_MULT;
     if (S.bump > 0) m *= GAME.BUMP_MULT;
+    // 맵별 장애물 (2바퀴에 한 곳, 코스 2개) — 점프로 공중에 떠 있으면 넘어감
+    scene.hazardSeed = meta?.raceId || null;
+    {
+      const theme = themeOf(me), lapI = Math.floor(S.dist / TRACK_LEN);
+      const hz = moving && S.dist >= 0 ? hazardAt(lapI, S.nLanes, meta?.raceId || '', theme) : null;
+      const rel = hz ? S.dist - lapI * TRACK_LEN - hz.s : -1;
+      const on = !!hz && !S.air && rel >= 0 && rel < hz.len && hz.lanes.includes(laneOfX(S.x));
+      const inSnow = on && hz.kind === 'snowdrift';
+      if (inSnow && !S.inSnow) { sound.snowdrift(); toast('❄️ 눈더미에 빠졌어요! 지나는 동안 느려져요'); }
+      S.inSnow = inSnow;
+      if (on && hz.kind !== 'snowdrift' && S.hzHit !== lapI) {
+        S.hzHit = lapI; S.hzSlow = GAME.HAZARD_TIME;
+        if (hz.kind === 'rock') { S.wobUntil = t + GAME.HAZARD_TIME; sound.rock(); S.shake = 0.25; toast('🪨 돌부리에 걸렸어요! 3초 동안 휘청휘청'); }
+        else { sound.mud(); toast('🟤 흙탕물 웅덩이! 3초 동안 느려져요'); }
+      }
+      if (S.inSnow || S.hzSlow > 0) m *= GAME.HAZARD_MULT;
+    }
     // 스로틀: 누르고 있으면 점점 오르고, 떼면 천천히 내려감. 부스트·발판·니트로 중에는 최대로
     if (moving && status !== 'paused') {
       if (S.gas && !stunned()) S.power = Math.min(1, S.power + dt * GAME.GAS_UP);
@@ -642,7 +667,7 @@ function frame(tms) {
       if (stunned()) S.speed *= Math.max(0, 1 - dt * 5);
       else S.speed += (target - S.speed) * Math.min(1, dt * (target > S.speed ? 2.2 : 3));
       S.dist += S.speed * dt;
-      for (const k of ['boost', 'pad', 'nitro', 'slow', 'bump', 'shield', 'fog', 'shake']) S[k] = Math.max(0, S[k] - dt);
+      for (const k of ['boost', 'pad', 'nitro', 'slow', 'bump', 'shield', 'fog', 'shake', 'hzSlow']) S[k] = Math.max(0, (S[k] || 0) - dt);
     }
     // 미사일 명중
     if (S.incoming && t >= S.incoming.hitAt) {
@@ -731,6 +756,7 @@ function frame(tms) {
     }
     if (S.air) { const ph = Math.min(1, (t - S.air.start) / S.air.dur); meFx.lift = Math.sin(ph * Math.PI) * 1.3; meFx.cheer = cheerAt(ph); }
     if (S.shield > 0) meFx.shield = true;
+    if (t < S.wobUntil) meFx.wobble = 0.45 + 0.55 * ((S.wobUntil - t) / GAME.HAZARD_TIME);
     Object.assign(st.me, meFx);
     if (status !== 'lobby') publish();
     updateHUD(dt);
@@ -748,7 +774,7 @@ function frame(tms) {
 }
 
 // 테스트·디버그용
-window.__kmr = { S, useItem, renderItems };
+window.__kmr = { boxAvail: (ri, li) => boxAvail(ri, li),  S, useItem, renderItems };
 
 // ───────── 시작 ─────────
 (async () => {

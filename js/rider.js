@@ -243,7 +243,7 @@ function drawBike(g, o) {
 
 /**
  * 레이서 그리기
- * o: { av, name, theme, t, lean, boost, moving, speedRatio, spin(rad), flip(rad), lift(월드단위 높이), cheer(0~1 만세), bubble, shield, label }
+ * o: { av, name, theme, t, lean, boost, moving, speedRatio, spin(rad), flip(rad), lift(월드단위 높이), cheer(0~1 만세), wobble(0~1 휘청), bubble, shield, label }
  */
 export function drawRider(ctx, x, y, k, o) {
   const u = k * 0.92;
@@ -260,6 +260,11 @@ export function drawRider(ctx, x, y, k, o) {
   const face = Math.cos(o.spin || 0);
   if (o.spin) ctx.scale(Math.max(0.3, Math.abs(face)), 1);
   ctx.rotate((o.lean || 0) * 0.1);
+  if (o.wobble) { // 돌부리에 걸려 좌우로 휘청
+    const w = Math.min(1, o.wobble), tt = (o.t || 0) * 11;
+    ctx.translate(Math.sin(tt + 0.7) * 0.14 * w, 0);
+    ctx.rotate(Math.sin(tt) * 0.32 * w);
+  }
   const theme = o.theme || 'snow';
   const headY = theme === 'falls' ? drawSurf(ctx, { ...o, av }) : theme === 'road' ? drawBike(ctx, { ...o, av }) : drawSled(ctx, { ...o, av });
   if (face >= 0) helmetBack(ctx, 0, headY, 0.31, av);
