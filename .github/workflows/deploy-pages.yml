@@ -9,17 +9,16 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # 1단계: 사이트 만들기 + 포장해서 올리기
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
       - name: 사이트 만들기 (문제 폴더 묶기 포함)
@@ -40,5 +39,23 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
-      - id: deployment
+
+  # 2단계: 배포 (1단계가 끝난 뒤 따로 실행, 실패하면 30초 뒤 한 번 더)
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url || steps.retry.outputs.page_url }}
+    steps:
+      - name: 배포
+        id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: 잠시 기다리기
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - name: 배포 (다시 시도)
+        id: retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
