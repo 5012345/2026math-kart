@@ -5,6 +5,7 @@ export const GAME = {
   GRID_GAP: 4.5,         // 출발 대열 줄 간격 (m) — 6코스 × 여러 줄
   GRID_FRONT: 2,         // 맨 앞줄이 출발선 뒤로 떨어진 거리 (m)
   START_GRACE: 3,
+  INVINCIBLE_PER: 100,   // 정답 무적 거리 = 100m × 연속 정답 수
   HAZARD_MULT: 0.7,      // 맵 장애물: 속도 30% 감소
   HAZARD_TIME: 3,        // 돌부리·웅덩이 감속 시간(초)        // 출발 직후 충돌 없는 시간 (초)
   BASE_SPEED: 30,        // m/s 최고 속도 (화면 표시 108km/h) — 한 바퀴 약 55초

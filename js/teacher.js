@@ -28,6 +28,12 @@ async function createRoom() {
   return code;
 }
 
+// QR 다시 보기 창
+$('btn-showqr').onclick = () => { $('qr-modal').classList.remove('hidden'); sound.unlock(); };
+$('qr-close').onclick = () => $('qr-modal').classList.add('hidden');
+$('qr-modal').onclick = (e) => { if (e.target.id === 'qr-modal') $('qr-modal').classList.add('hidden'); };
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('qr-modal').classList.add('hidden'); });
+
 async function openRoom(code) {
   unsubs.splice(0).forEach((u) => u && u());
   room = code;
@@ -37,6 +43,7 @@ async function openRoom(code) {
   $('join-url').textContent = url + (isMock ? '  (로컬 테스트: 같은 브라우저의 새 탭에서 열기)' : '');
   $('join-url').onclick = () => window.open(url, '_blank');
   $('btn-open-student').onclick = () => window.open(url, '_blank');
+  $('qr-big').innerHTML = qrSVG(url); $('qr-code-big').textContent = room; $('qr-url').textContent = url;
   unsubs.push(db.on(`${base()}/meta`, (v) => { meta = v; route(); }));
   unsubs.push(db.on(`${base()}/phase`, (v) => { phase = v; }));
   unsubs.push(db.on(`${base()}/quiz`, (v) => { quiz = v ? Object.values(v) : null; }));
@@ -62,6 +69,8 @@ function route() {
   $('v-lobby').classList.toggle('hidden', st !== 'lobby');
   $('v-race').classList.toggle('hidden', !(st === 'racing' || st === 'paused'));
   $('v-final').classList.toggle('hidden', st !== 'finished');
+  $('btn-showqr').classList.toggle('hidden', st === 'lobby');
+  if (st === 'lobby') $('qr-modal').classList.add('hidden');
   $('btn-pause').textContent = st === 'paused' ? '▶ 다시 출발' : '⏸ 일시정지';
   $('h-info').textContent = st === 'lobby' ? '' : `${THEMES[meta.theme]?.emoji || '🎲'} ${meta.setTitle || ''}`;
   if (st === 'finished') {

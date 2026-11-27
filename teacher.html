@@ -15,10 +15,23 @@
       <div class="spacer"></div>
       <div id="h-info" style="font-weight:800"></div>
       <div class="code">방 <span id="h-code">------</span></div>
+      <button class="btn hidden" id="btn-showqr" style="padding:8px 16px;font-size:17px;background:#ffd60a;color:#1e293b">📱 QR 다시 보기</button>
       <a class="btn ghost" href="sound-test.html" target="_blank" title="사운드 테스트 (새 탭)" style="padding:8px 14px;font-size:16px;text-decoration:none">🎵 소리 테스트</a>
       <button class="btn ghost" id="btn-sound" style="padding:8px 14px;font-size:16px">🔊</button>
       <button class="btn ghost" id="btn-newroom" style="padding:8px 14px;font-size:16px">새 방</button>
     </header>
+
+    <!-- 게임 중 QR 다시 보기 (튕긴 학생 재입장용) -->
+    <div id="qr-modal" class="qr-modal hidden" role="dialog" aria-label="입장 QR 코드">
+      <div class="qr-card">
+        <button class="qr-close" id="qr-close" aria-label="닫기">✕</button>
+        <h2>📱 다시 들어오기</h2>
+        <p>튕긴 학생은 이 QR을 찍으면 <b>하던 자리 그대로</b> 이어서 달려요.</p>
+        <div class="qr-big" id="qr-big"></div>
+        <div class="qr-code">방 <b id="qr-code-big">------</b></div>
+        <div class="qr-url" id="qr-url"></div>
+      </div>
+    </div>
 
     <!-- 대기실 -->
     <main class="t-body t-lobby" id="v-lobby">

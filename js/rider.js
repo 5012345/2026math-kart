@@ -243,7 +243,7 @@ function drawBike(g, o) {
 
 /**
  * 레이서 그리기
- * o: { av, name, theme, t, lean, boost, moving, speedRatio, spin(rad), flip(rad), lift(월드단위 높이), cheer(0~1 만세), wobble(0~1 휘청), bubble, shield, label }
+ * o: { av, name, theme, t, lean, boost, moving, speedRatio, spin(rad), flip(rad), lift(월드단위 높이), cheer(0~1 만세), wobble(0~1 휘청), invincible(정답 무적), bubble, shield, label }
  */
 export function drawRider(ctx, x, y, k, o) {
   const u = k * 0.92;
@@ -264,6 +264,22 @@ export function drawRider(ctx, x, y, k, o) {
     const w = Math.min(1, o.wobble), tt = (o.t || 0) * 11;
     ctx.translate(Math.sin(tt + 0.7) * 0.14 * w, 0);
     ctx.rotate(Math.sin(tt) * 0.32 * w);
+  }
+  if (o.invincible) { // 정답 무적: 무지개빛 오라 + 반짝이
+    const tt = o.t || 0, hue = (tt * 220) % 360;
+    const gr = ctx.createRadialGradient(0, -0.8, 0.2, 0, -0.8, 1.35);
+    gr.addColorStop(0, `hsla(${hue},100%,70%,0.55)`); gr.addColorStop(0.6, `hsla(${(hue + 60) % 360},100%,60%,0.3)`); gr.addColorStop(1, `hsla(${(hue + 120) % 360},100%,60%,0)`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, -0.8, 1.25, 1.45, 0, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 3; i++) { // 무지개 테두리
+      ctx.strokeStyle = `hsla(${(hue + i * 90) % 360},100%,62%,${0.85 - i * 0.2})`; ctx.lineWidth = 0.07;
+      ctx.beginPath(); ctx.ellipse(0, -0.8, 1.18 - i * 0.09, 1.38 - i * 0.09, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    for (let i = 0; i < 5; i++) {
+      const a = tt * 3 + (i / 5) * Math.PI * 2, r = 1.05 + Math.sin(tt * 6 + i) * 0.1;
+      const sx = Math.cos(a) * r, sy = -0.8 + Math.sin(a) * r * 1.15, sz = 0.09 + 0.04 * Math.sin(tt * 9 + i);
+      ctx.fillStyle = `hsl(${(hue + i * 70) % 360},100%,75%)`;
+      ctx.beginPath(); for (let j = 0; j < 8; j++) { const rr = j % 2 ? sz * 0.4 : sz, aa = (j / 8) * Math.PI * 2; ctx.lineTo(sx + Math.cos(aa) * rr, sy + Math.sin(aa) * rr); } ctx.closePath(); ctx.fill();
+    }
   }
   const theme = o.theme || 'snow';
   const headY = theme === 'falls' ? drawSurf(ctx, { ...o, av }) : theme === 'road' ? drawBike(ctx, { ...o, av }) : drawSled(ctx, { ...o, av });

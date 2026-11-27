@@ -176,7 +176,7 @@ function resetRace() {
   S.nLanes = spot.cols; scene.lanes = spot.cols; // 첫 문제 코스 수로 미리 맞춰 둬야 자리가 옮겨지지 않음
   S.lane = spot.lane; S.goT = null;
   const start = -(GAME.GRID_FRONT + back);
-  Object.assign(S, { dist: start, prevDist: start, speed: 0, power: 0, gasUsed: false, boost: 0, pad: 0, nitro: 0, slow: 0, bump: 0, shield: 0, fog: 0, stun: null, air: null, incoming: null, items: [], correct: 0, streak: 0, best: 0, curIdx: -1, curKind: null, qi: 0, resultIdx: -1, resultUntil: 0, finAt: 0, finishedShown: false, hzSlow: 0, hzHit: null, wobUntil: 0, inSnow: false });
+  Object.assign(S, { dist: start, prevDist: start, speed: 0, power: 0, gasUsed: false, boost: 0, pad: 0, nitro: 0, slow: 0, bump: 0, shield: 0, fog: 0, stun: null, air: null, incoming: null, items: [], correct: 0, streak: 0, best: 0, curIdx: -1, curKind: null, qi: 0, resultIdx: -1, resultUntil: 0, finAt: 0, finishedShown: false, hzSlow: 0, hzHit: null, wobUntil: 0, inSnow: false, invEnd: -1e9 });
   $('scr-final').classList.add('hidden');
   setTimeout(() => toast(`🚦 출발 위치: ${spot.row + 1}번째 줄 · ${LANE_LABELS[spot.lane]}코스${spot.row ? ` (뒷줄 보정 ${(S.creditMs / 1000).toFixed(2)}초)` : ''}`), 300);
   S.judged = new Set(); S.seen = new Set(); S.picked = new Set(); S.bumpCD = {};
@@ -331,8 +331,10 @@ function judge(idx) {
     S.correct++; S.streak++; S.best = Math.max(S.best, S.streak);
     S.boost = GAME.BOOST_TIME + Math.min(4, S.streak - 1) * GAME.STREAK_BONUS;
     S.slow = 0;
+    S.invEnd = Math.max(S.invEnd ?? -1e9, checkpointAbs(idx) + GAME.INVINCIBLE_PER * S.streak); // 통과 지점부터 100m × 연속 정답
     sound.boost();
     centerMsg(S.streak >= 2 ? `${S.streak} COMBO!` : 'BOOST!', 'boost');
+    toast(`⭐ ${GAME.INVINCIBLE_PER * S.streak}m 동안 무적! 장애물·아이템·충돌을 모두 무시해요`);
   } else {
     S.streak = 0; S.slow = GAME.SLOW_TIME; S.boost = 0;
     sound.wrong();
@@ -352,7 +354,10 @@ function stun(type, secs) {
 }
 const stunned = () => S.stun && nowL() < S.stun.end;
 /** 공격 받기: 방패가 있으면 막아냄 */
+/** 정답 무적 중인지 (남은 거리 > 0) */
+const invincible = () => S.dist < (S.invEnd ?? -1e9);
 function takeHit(type, secs, msg) {
+  if (invincible()) { toast('⭐ 무적! 아무 영향도 받지 않아요'); sound.block(); return false; }
   if (S.shield > 0) { S.shield = 0; toast('🛡️ 방패가 막아냈어요!'); sound.block(); scene.burst(scene.meScreen.x / scene.cssScale, scene.meScreen.y / scene.cssScale - 60, 16, '#7cffc4'); publish(true); return false; }
   stun(type, secs);
   if (msg) toast(msg);
@@ -433,7 +438,7 @@ function onEvents(all) {
       $('warn').classList.add('show');
     } else if (ev.type === 'fog') {
       const gap = ev.d - S.dist;
-      if (gap > 0 && gap < 400) { S.fog = GAME.FOG_TIME; toast(`🌫️ ${players[ev.from]?.name || ''}님의 안개! 앞이 잘 안 보여요`); sound.fogged(); }
+      if (gap > 0 && gap < 400 && !invincible()) { S.fog = GAME.FOG_TIME; toast(`🌫️ ${players[ev.from]?.name || ''}님의 안개! 앞이 잘 안 보여요`); sound.fogged(); }
     } else if ((ev.type === 'bananaHit' || ev.type === 'missileHit') && ev.by === pid) {
       sound.hitConfirm(); toast(`${ev.type === 'bananaHit' ? '🍌' : '🚀'} ${players[ev.to]?.name || ''}님에게 명중!`);
     } else if (ev.type === 'water') {
@@ -498,10 +503,10 @@ function courseEvents(t) {
 }
 function collisions(t, tx) {
   if (S.goT == null || t - S.goT < GAME.START_GRACE) return; // 출발 직후에는 충돌 없음
-  if (stunned() || S.shield > 0 || S.speed < 3 || S.air) return;
+  if (stunned() || S.shield > 0 || S.speed < 3 || S.air || invincible()) return; // 무적이면 부딪히지 않음
   for (const [oid, o] of others) {
     const p = progress[oid];
-    if (!p || o.dd == null) continue;
+    if (!p || o.dd == null) continue; // 무적인 친구와 부딪혀도 나는 정상적으로 느려짐 (무적인 친구만 영향 없음)
     if ((S.bumpCD[oid] || 0) > t) continue;
     const dx = o.x - S.x, dd = o.dd;
     if (Math.abs(dx) > 0.8) continue;
@@ -532,7 +537,7 @@ function publish(force = false) {
   S.lastPub = now;
   db.set(`rooms/${room}/progress/${pid}`, {
     d: Math.round(S.dist * 10) / 10, v: Math.round(S.speed * 10) / 10, l: physLane(),
-    c: S.correct, s: S.streak, b: S.best, j: [...S.judged].join(','), r: meta?.raceId || '', q: S.qi, n: S.nLanes, fin: S.finAt || 0, go: S.gridOff || 0,
+    c: S.correct, s: S.streak, b: S.best, j: [...S.judged].join(','), r: meta?.raceId || '', q: S.qi, n: S.nLanes, fin: S.finAt || 0, go: S.gridOff || 0, iv: invincible() ? 1 : 0,
     bo: S.boost > 0 || S.pad > 0 || S.nitro > 0 ? 1 : 0, ...fxForPublish(), t: db.now(),
   });
 }
@@ -574,6 +579,9 @@ function updateHUD(dt) {
   $('lap-num').textContent = Math.min(lapOf(S.dist), Math.max(1, NQ()));
   $('acc').textContent = S.correct;
   $('combo').textContent = S.streak >= 2 ? `🔥 ${S.streak} COMBO` : '';
+  const ivLeft = Math.ceil((S.invEnd ?? -1e9) - S.dist);
+  $('inv').classList.toggle('show', ivLeft > 0 && !S.finAt);
+  if (ivLeft > 0) $('inv-m').textContent = ivLeft;
   const elapsed = meta?.raceStart ? effNow() - meta.raceStart : 0;
   $('clock').textContent = fmtTime(elapsed);
   // 순환 미니맵
@@ -641,7 +649,7 @@ function frame(tms) {
       const theme = themeOf(me), lapI = Math.floor(S.dist / TRACK_LEN);
       const hz = moving && S.dist >= 0 ? hazardAt(lapI, S.nLanes, meta?.raceId || '', theme) : null;
       const rel = hz ? S.dist - lapI * TRACK_LEN - hz.s : -1;
-      const on = !!hz && !S.air && rel >= 0 && rel < hz.len && hz.lanes.includes(laneOfX(S.x));
+      const on = !!hz && !S.air && !invincible() && rel >= 0 && rel < hz.len && hz.lanes.includes(laneOfX(S.x));
       const inSnow = on && hz.kind === 'snowdrift';
       if (inSnow && !S.inSnow) { sound.snowdrift(); toast('❄️ 눈더미에 빠졌어요! 지나는 동안 느려져요'); }
       S.inSnow = inSnow;
@@ -735,7 +743,7 @@ function frame(tms) {
     st.others = [...others.entries()].filter(([, o]) => o.dd > -0.8 && o.dd < 90).sort((a, b) => Math.abs(a[1].dd) - Math.abs(b[1].dd)).slice(0, 10)
       .map(([oid, o]) => {
         const p = progress[oid]; const pl = players[oid];
-        return { dd: o.dd, x: o.x, label: pl.name, avatar: pl, name: pl.name, theme: themeOf(pl), boost: !!p.bo, seed: hashStr(oid) % 10, ...fxDrawOpts(p.fx, p.fs, p.fe, sNow) };
+        return { dd: o.dd, x: o.x, label: pl.name, avatar: pl, name: pl.name, theme: themeOf(pl), boost: !!p.bo, invincible: !!p.iv, seed: hashStr(oid) % 10, ...fxDrawOpts(p.fx, p.fs, p.fe, sNow) };
       });
     st.hazards = itemsOn() ? Object.values(hazards).map((h) => ({ dd: h.d - S.dist, x: h.x })) : [];
     st.items = itemsOn();
@@ -756,6 +764,7 @@ function frame(tms) {
     }
     if (S.air) { const ph = Math.min(1, (t - S.air.start) / S.air.dur); meFx.lift = Math.sin(ph * Math.PI) * 1.3; meFx.cheer = cheerAt(ph); }
     if (S.shield > 0) meFx.shield = true;
+    if (invincible()) meFx.invincible = true;
     if (t < S.wobUntil) meFx.wobble = 0.45 + 0.55 * ((S.wobUntil - t) / GAME.HAZARD_TIME);
     Object.assign(st.me, meFx);
     if (status !== 'lobby') publish();

@@ -56,6 +56,20 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 #hud-right .lap { font-size: 22px; }
 #hud-right .lap b { font-size: 34px; color: var(--yellow); }
 #hud-right .combo { margin-top: 4px; font-size: 22px; color: #ffb703; }
+#hud-right .inv { display: none; margin-top: 6px; padding: 4px 12px; border-radius: 999px; font-size: 18px; font-weight: 900; color: #fff; background: linear-gradient(90deg, #ff4d6d, #ffb703, #2bb673, #3a86ff, #9b5de5); background-size: 300% 100%; animation: invFlow 1.2s linear infinite; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+#hud-right .inv.show { display: inline-block; }
+@keyframes invFlow { to { background-position: 300% 0; } }
+/* 교사: 게임 중 QR 다시 보기 */
+.qr-modal { position: fixed; inset: 0; z-index: 500; background: rgba(10, 20, 50, 0.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.qr-modal.hidden { display: none; }
+.qr-card { position: relative; background: #fff; color: #1e293b; border-radius: 28px; padding: 22px 34px 24px; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); max-height: 96vh; overflow: auto; }
+.qr-card h2 { margin: 0 0 4px; font-size: 30px; }
+.qr-card p { margin: 0 0 12px; font-weight: 700; color: #475569; }
+.qr-big svg { width: min(62vh, 80vw); height: auto; display: block; margin: 0 auto; }
+.qr-code { margin-top: 10px; font-size: 26px; font-weight: 900; }
+.qr-code b { font-size: 44px; letter-spacing: 6px; color: #3a86ff; }
+.qr-url { font-size: 14px; color: #64748b; word-break: break-all; }
+.qr-close { position: absolute; top: 12px; right: 14px; width: 48px; height: 48px; border-radius: 50%; border: none; background: #e2e8f0; font-size: 22px; font-weight: 900; cursor: pointer; }
 #hud-right .acc { font-size: 15px; opacity: 0.9; }
 #hud-right .lapbig { font-size: 20px; color: #9be7ff; }
 #hud-right .lapbig b { font-size: 40px; color: #fff; }
